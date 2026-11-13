@@ -17,7 +17,10 @@ permissions:
 # builds without them, and reports clearly when it cannot — see the guard step.
 
 jobs:
-  build:
+  # Always runs. Parses every Swift source with the toolchain the runner already
+  # has, so a syntax error fails CI before the archive job is reached. This is a
+  # parse, not a type-check: it needs no SDK frameworks and no native xcframeworks.
+  syntax:
     runs-on: macos-15
     steps:
       - name: Checkout
@@ -29,30 +32,48 @@ jobs:
         run: |
           sudo xcode-select -s /Applications/Xcode.app
           xcodebuild -version
+          swift --version
 
-      - name: Check for the generated project
+      - name: Parse Swift sources
+        run: |
+          set -euo pipefail
+          fail=0
+          while IFS= read -r file; do
+            if ! xcrun swiftc -parse "$file" >/tmp/parse.log 2>&1; then
+              echo "::error file=$file::$(head -n 5 /tmp/parse.log | tr '\n' ' ')"
+              fail=1
+            fi
+          done < <(find IOSLocalLLM CoreAIOnDeviceLAS -name '*.swift' -not -path '*/Vendor/*')
+          exit $fail
+
+  # Archives only when the tracked project and the native inference frameworks
+  # are both present. The frameworks are gitignored build outputs, so a fork
+  # needs to run scripts/build_native_frameworks.sh on an Apple-silicon Mac once.
+  build:
+    runs-on: macos-15
+    needs: syntax
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: false
+
+      - name: Select Xcode
+        run: sudo xcode-select -s /Applications/Xcode.app
+
+      - name: Check prerequisites
         id: guard
         run: |
-          if [ ! -d "OnDeviceLAS.xcodeproj" ]; then
-            echo "present=false" >> "$GITHUB_OUTPUT"
-            echo "::notice::OnDeviceLAS.xcodeproj is missing; run xcodegen before building."
-          else
-            echo "present=true" >> "$GITHUB_OUTPUT"
-          fi
-
-      - name: Guard on native frameworks
-        id: native
-        if: steps.guard.outputs.present == 'true'
-        run: |
-          if [ -d "ThirdParty/llama.cpp/build-apple/llama.xcframework" ]; then
+          if [ -d "OnDeviceLAS.xcodeproj" ] \
+             && [ -d "ThirdParty/llama.cpp/build-apple/llama.xcframework" ]; then
             echo "ready=true" >> "$GITHUB_OUTPUT"
           else
             echo "ready=false" >> "$GITHUB_OUTPUT"
-            echo "::warning::llama.xcframework is absent. Build it with ./scripts/build_native_frameworks.sh on an Apple-silicon Mac, then re-dispatch."
+            echo "::notice::Skipping the archive: OnDeviceLAS.xcodeproj or llama.xcframework is missing. Build the frameworks with scripts/build_native_frameworks.sh, then dispatch again."
           fi
 
       - name: Archive
-        if: steps.guard.outputs.present == 'true' && steps.native.outputs.ready == 'true'
+        if: steps.guard.outputs.ready == 'true'
         run: |
           xcodebuild \
             -project OnDeviceLAS.xcodeproj \
@@ -66,7 +87,7 @@ jobs:
             CODE_SIGNING_REQUIRED=NO
 
       - name: Package unsigned IPA
-        if: steps.guard.outputs.present == 'true' && steps.native.outputs.ready == 'true'
+        if: steps.guard.outputs.ready == 'true'
         run: |
           mkdir -p Payload
           cp -R "build/LocalLLMSketch.xcarchive/Products/Applications/"*.app Payload/
@@ -74,7 +95,7 @@ jobs:
 
       - name: Read app version
         id: version
-        if: steps.guard.outputs.present == 'true' && steps.native.outputs.ready == 'true'
+        if: steps.guard.outputs.ready == 'true'
         run: |
           VERSION=$(/usr/libexec/PlistBuddy -c \
             "Print :CFBundleShortVersionString" \
@@ -83,18 +104,16 @@ jobs:
 
       - name: Determine release channel
         id: channel
-        if: steps.guard.outputs.present == 'true' && steps.native.outputs.ready == 'true'
+        if: steps.guard.outputs.ready == 'true'
         run: |
           if [ "$GITHUB_REF_NAME" = "main" ]; then
             echo "suffix=" >> "$GITHUB_OUTPUT"
-            echo "body=Unsigned IPA built from main. Re-sign it with your own certificate to install." >> "$GITHUB_OUTPUT"
           else
             echo "suffix=-preview" >> "$GITHUB_OUTPUT"
-            echo "body=Unsigned IPA built from the preview branch. Re-sign it with your own certificate to install." >> "$GITHUB_OUTPUT"
           fi
 
       - name: Upload IPA artifact
-        if: steps.guard.outputs.present == 'true' && steps.native.outputs.ready == 'true'
+        if: steps.guard.outputs.ready == 'true'
         uses: actions/upload-artifact@v4
         with:
           name: LocalLLMSketch-ipa${{ steps.channel.outputs.suffix }}
@@ -102,11 +121,11 @@ jobs:
           if-no-files-found: error
 
       - name: Attach IPA to GitHub release
-        if: steps.guard.outputs.present == 'true' && steps.native.outputs.ready == 'true'
+        if: steps.guard.outputs.ready == 'true'
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ format('v{0}', steps.version.outputs.version) }}
           name: ${{ format('Local LLM Sketch v{0}', steps.version.outputs.version) }}
-          body: ${{ steps.channel.outputs.body }}
+          body: Unsigned IPA built from ${{ github.ref_name }}. Re-sign it with your own certificate to install.
           files: LocalLLMSketch.ipa
           fail_on_unmatched_files: true
