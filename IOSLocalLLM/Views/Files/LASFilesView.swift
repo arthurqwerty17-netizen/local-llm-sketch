@@ -34,7 +34,7 @@ struct LASFilesView: View {
                         fileList
                     }
                     if showingShell { shellCard }
-                    if !git.repositories.isEmpty { gitCard }
+                    gitCard
                 }
                 .padding(.horizontal, LASDesignTokens.pageInset)
                 .padding(.top, LASDesignTokens.row)

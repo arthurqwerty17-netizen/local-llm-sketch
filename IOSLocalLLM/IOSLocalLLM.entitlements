@@ -12,5 +12,17 @@
        space on devices with >4 GB of physical memory. -->
   <key>com.apple.developer.kernel.extended-virtual-addressing</key>
   <true/>
+  <!-- JIT. Only honoured by sideload signing paths that preserve the
+       entitlement (TrollStore always; AltStore/SideStore/Sideloadly when the
+       signing profile carries `get-task-allow`). App Store review strips it.
+       Needed by anything that turns generated machine code into an executable
+       page at runtime — an interpreter or an emulator — and harmless when no
+       such code runs. -->
+  <key>com.apple.security.cs.allow-jit</key>
+  <true/>
+  <key>com.apple.security.cs.allow-unsigned-executable-memory</key>
+  <true/>
+  <key>dynamic-codesigning</key>
+  <true/>
 </dict>
 </plist>

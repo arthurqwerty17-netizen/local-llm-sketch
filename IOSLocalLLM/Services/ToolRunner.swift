@@ -785,7 +785,18 @@ enum ToolRunner {
         guard browser.currentURL != nil else {
             return "No page is open in the browser. Use browser_navigate(url) first."
         }
+        TabRouter.shared.show(.browser)
+        BrowserActivityFeed.shared.begin(
+            .read,
+            "Reading “\(browser.pageTitle.isEmpty ? "page" : browser.pageTitle)”",
+            detail: browser.currentURL?.host
+        )
         let block = await browser.pageContextBlock()
+        BrowserActivityFeed.shared.end(
+            .done,
+            "Read \(block.count) characters",
+            detail: browser.currentURL?.absoluteString
+        )
         return block.isEmpty ? "The page produced no readable text." : block
     }
 
@@ -798,8 +809,13 @@ enum ToolRunner {
         guard let url = FocusBrowser.resolve(raw) else {
             return "Error: '\(raw)' is not a usable URL."
         }
+        BrowserActivityFeed.shared.begin(.navigate, "Opening \(url.host ?? url.absoluteString)",
+                                         detail: url.absoluteString)
+        // Bring the browser forward so the user watches this happen.
+        TabRouter.shared.show(.browser)
         FocusBrowser.shared.load(url)
-        return "Opened \(url.absoluteString) in the in-app browser."
+        BrowserActivityFeed.shared.end(.done, "Opened \(url.absoluteString)")
+        return "Opened \(url.absoluteString) in the in-app browser. The user can watch it live."
     }
 
     @MainActor
@@ -810,6 +826,11 @@ enum ToolRunner {
             return true
         }()
         FocusBrowser.shared.setDesktopMode(enabled)
+        BrowserActivityFeed.shared.note(
+            .desktop,
+            "Desktop mode \(enabled ? "on" : "off")",
+            detail: FocusBrowser.shared.currentURL?.absoluteString
+        )
         return "Desktop mode \(enabled ? "on" : "off"). The page reloads to apply it."
     }
 

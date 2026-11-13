@@ -31,16 +31,40 @@ enum LASTopTab: String, CaseIterable, Identifiable {
     }
 }
 
+// MARK: - TabRouter
+//
+// Which top tab is showing, held outside the view so non-UI code can bring the
+// browser forward. When the assistant drives the browser the user should be
+// looking at it, otherwise "watching the AI work" means nothing.
+
+@MainActor
+final class TabRouter: ObservableObject {
+    static let shared = TabRouter()
+    @Published var selection: LASTopTab = .chat
+    private init() {}
+
+    /// Bring a tab forward. Used by the browser tools after they act.
+    func show(_ tab: LASTopTab) {
+        guard selection != tab else { return }
+        selection = tab
+    }
+}
+
 struct LASTopTabBar: View {
 
-    @Binding var selection: LASTopTab
+    @ObservedObject private var router = TabRouter.shared
+
+    private var selection: Binding<LASTopTab> {
+        Binding(get: { router.selection }, set: { router.selection = $0 })
+    }
+
     @Environment(\.koduTheme) private var T
 
     var body: some View {
         HStack(spacing: 4) {
             ForEach(LASTopTab.allCases) { tab in
                 Button {
-                    withAnimation(.easeInOut(duration: 0.18)) { selection = tab }
+                    withAnimation(.easeInOut(duration: 0.18)) { router.selection = tab }
                     HapticManager.impact(.light)
                 } label: {
                     HStack(spacing: 5) {
@@ -48,17 +72,23 @@ struct LASTopTabBar: View {
                             .font(.system(size: 12, weight: .semibold))
                         Text(tab.title)
                             .font(.caption.weight(.semibold))
+                        // Live dot: the assistant is driving the browser.
+                        if tab == .browser, BrowserActivityFeed.shared.isActive {
+                            Circle()
+                                .fill(T.accentStrong)
+                                .frame(width: 5, height: 5)
+                        }
                     }
                     .frame(maxWidth: .infinity, minHeight: 32)
                     .background(
-                        selection == tab ? T.accentSoft : Color.clear,
+                        router.selection == tab ? T.accentSoft : Color.clear,
                         in: Capsule()
                     )
-                    .foregroundStyle(selection == tab ? T.accentStrong : .secondary)
+                    .foregroundStyle(router.selection == tab ? T.accentStrong : .secondary)
                     .contentShape(Capsule())
                 }
                 .buttonStyle(.plain)
-                .accessibilityAddTraits(selection == tab ? [.isButton, .isSelected] : .isButton)
+                .accessibilityAddTraits(router.selection == tab ? [.isButton, .isSelected] : .isButton)
             }
         }
         .padding(3)

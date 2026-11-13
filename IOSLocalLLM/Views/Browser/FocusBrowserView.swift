@@ -14,16 +14,19 @@ struct FocusBrowserView: View {
     @ObservedObject private var browser = FocusBrowser.shared
     @ObservedObject private var files = WorkspaceFileStore.shared
     @ObservedObject private var agent = BrowsingAgentService.shared
+    @ObservedObject private var feed = BrowserActivityFeed.shared
     @Environment(\.koduTheme) private var T
 
     @State private var editingAddress = false
     @State private var showingAI = false
+    @State private var showingActivity = false
     @FocusState private var addressFocused: Bool
 
     var body: some View {
         VStack(spacing: 0) {
             addressBar
             progressBar
+            activityStrip
             page
             controlBar
         }
@@ -116,6 +119,87 @@ struct FocusBrowserView: View {
         }
         .frame(height: 2)
         .padding(.top, 4)
+    }
+
+    // MARK: - AI activity
+    //
+    // The live trace of what the assistant is doing in this browser. It sits
+    // under the address bar so the user watches the agent rather than a spinner:
+    // each line is a real action (URL opened, page read, file downloaded).
+
+    @ViewBuilder
+    private var activityStrip: some View {
+        if feed.isActive || !feed.steps.isEmpty {
+            VStack(alignment: .leading, spacing: 0) {
+                Button {
+                    withAnimation(.easeInOut(duration: 0.2)) { showingActivity.toggle() }
+                } label: {
+                    HStack(spacing: 6) {
+                        if feed.isActive {
+                            ProgressView().controlSize(.mini)
+                        } else {
+                            Image(systemName: "checkmark.circle.fill")
+                                .font(.system(size: 11))
+                                .foregroundStyle(T.good)
+                        }
+                        Text(feed.isActive ? "AI is browsing" : "AI finished browsing")
+                            .font(.caption2.weight(.semibold))
+                        Text(feed.statusLine)
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                            .lineLimit(1)
+                        Spacer(minLength: 0)
+                        Text("\(feed.steps.count)")
+                            .font(.caption2.monospaced())
+                            .foregroundStyle(.secondary)
+                        Image(systemName: showingActivity ? "chevron.up" : "chevron.down")
+                            .font(.system(size: 9, weight: .bold))
+                            .foregroundStyle(.secondary)
+                    }
+                    .padding(.horizontal, LASDesignTokens.pageInset)
+                    .padding(.vertical, 7)
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+
+                if showingActivity {
+                    VStack(alignment: .leading, spacing: 5) {
+                        ForEach(feed.steps.suffix(12)) { step in
+                            HStack(alignment: .firstTextBaseline, spacing: 6) {
+                                Image(systemName: step.kind.symbol)
+                                    .font(.system(size: 9))
+                                    .foregroundStyle(.secondary)
+                                    .frame(width: 12)
+                                Text(step.kind.label)
+                                    .font(.system(size: 8, weight: .bold, design: .monospaced))
+                                    .foregroundStyle(T.accentStrong)
+                                    .frame(width: 54, alignment: .leading)
+                                VStack(alignment: .leading, spacing: 1) {
+                                    Text(step.title)
+                                        .font(.caption2)
+                                        .lineLimit(1)
+                                    if let detail = step.detail {
+                                        Text(detail)
+                                            .font(.system(size: 9, design: .monospaced))
+                                            .foregroundStyle(.secondary)
+                                            .lineLimit(1)
+                                            .truncationMode(.middle)
+                                    }
+                                }
+                                Spacer(minLength: 0)
+                            }
+                        }
+                    }
+                    .padding(.horizontal, LASDesignTokens.pageInset)
+                    .padding(.bottom, 8)
+                }
+            }
+            .background(.ultraThinMaterial.opacity(0.5))
+            .overlay(alignment: .bottom) {
+                Rectangle().fill(LASDesignTokens.hairline).frame(height: 1)
+            }
+            .transition(.opacity)
+        }
     }
 
     // MARK: - Page

@@ -7,6 +7,30 @@ and intends to use semantic version tags for source releases.
 
 ### Added
 
+- Live AI activity feed in the Web tab: every browser action the assistant takes
+  (navigate, read, desktop mode, download) is shown as it happens, with the real
+  URL and outcome. The Web tab comes forward automatically when the model acts,
+  and the tab bar shows a live dot while it is working.
+- `CapabilityProbe`: the app now tests for executable memory at runtime instead
+  of assuming JIT, and reports the result in Session and in the agent's brief.
+- JIT and unsigned-executable-memory entitlements in
+  `IOSLocalLLM.entitlements`, for sideload signing paths that preserve them.
+- `Build IPA` now builds everything it needs on the runner: pinned submodules,
+  `llama.xcframework`, XcodeGen, CocoaPods, archive, IPA, release.
+- `scripts/build_native_frameworks.sh --skip-whisper` for CI, which does not
+  link whisper.cpp.
+
+### Changed
+
+- README, badges and release docs now describe this fork rather than upstream.
+
+### Removed
+
+- `scorecard.yml`: it fails on this repository and adds nothing to a sideload
+  build. `codeql` and `validate` remain.
+
+## [Fork point]
+
 - In-app browser (WKWebView) with a tracker blocklist, smart address bar,
   desktop mode, downloads onto the Files shelf, and a readable page context for
   the assistant.
@@ -84,6 +108,6 @@ and intends to use semantic version tags for source releases.
 - Added high-confidence Clang warnings and static analyzer checks.
 - Expanded responsible disclosure and repository validation guidance.
 
-[Unreleased]: https://github.com/Mesutcydev/ios-local-llm/compare/v3.2.6...HEAD
+[Unreleased]: https://github.com/arthurdcosta311-sketch/local-llm-sketch/commits/main
 [3.2.6]: https://github.com/Mesutcydev/ios-local-llm/releases/tag/v3.2.6
 [3.2.5]: https://github.com/Mesutcydev/ios-local-llm/releases/tag/v3.2.5

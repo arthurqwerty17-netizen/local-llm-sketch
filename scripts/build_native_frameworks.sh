@@ -7,13 +7,21 @@ set -euo pipefail
 
 repository_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 include_catalyst=0
+skip_whisper=0
 
-if [[ "${1:-}" == "--with-catalyst" ]]; then
-  include_catalyst=1
-elif [[ $# -gt 0 ]]; then
-  echo "usage: $0 [--with-catalyst]" >&2
-  exit 64
-fi
+for arg in "$@"; do
+  case "$arg" in
+    --with-catalyst) include_catalyst=1 ;;
+    # The OnDeviceLAS target links llama.xcframework only; whisper.cpp is used
+    # by voice sources this target excludes. CI passes this to keep the build
+    # under the job timeout.
+    --skip-whisper)  skip_whisper=1 ;;
+    *)
+      echo "usage: $0 [--with-catalyst] [--skip-whisper]" >&2
+      exit 64
+      ;;
+  esac
+done
 
 git -C "$repository_root" submodule update --init --recursive
 
@@ -35,7 +43,8 @@ if [[ -e "${llama_root}/build-apple/llama.xcframework" ]]; then
   echo "error: generated llama.xcframework already exists; remove it before rebuilding" >&2
   exit 1
 fi
-if [[ -e "${repository_root}/ThirdParty/whisper.cpp/build-apple/whisper.xcframework" ]]; then
+if [[ -e "${repository_root}/ThirdParty/whisper.cpp/build-apple/whisper.xcframework" ]] \
+   && [[ "$skip_whisper" == 0 ]]; then
   echo "error: generated whisper.xcframework already exists; remove it before rebuilding" >&2
   exit 1
 fi
@@ -43,12 +52,18 @@ fi
 echo "==> Building llama.cpp iOS XCFramework"
 (cd "$llama_root" && IOS_ONLY=1 ./build-xcframework.sh)
 
-echo "==> Building whisper.cpp iOS XCFramework"
-"${repository_root}/scripts/native/build_whisper_ios.sh"
+if [[ "$skip_whisper" == 0 ]]; then
+  echo "==> Building whisper.cpp iOS XCFramework"
+  "${repository_root}/scripts/native/build_whisper_ios.sh"
+else
+  echo "==> Skipping whisper.cpp (--skip-whisper)"
+fi
 
 if [[ "$include_catalyst" == 1 ]]; then
   "${repository_root}/scripts/native/build_catalyst_slice.sh" llama
-  "${repository_root}/scripts/native/build_catalyst_slice.sh" whisper
+  if [[ "$skip_whisper" == 0 ]]; then
+    "${repository_root}/scripts/native/build_catalyst_slice.sh" whisper
+  fi
 fi
 
 echo "==> Native frameworks are ready"

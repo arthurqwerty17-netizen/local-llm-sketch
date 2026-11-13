@@ -48,6 +48,16 @@ enum AgentCapabilityBrief {
           checks and reports that compilation needs CI.
         """)
 
+        // Watchability: the user sees these actions live in the Web tab.
+        let feed = BrowserActivityFeed.shared
+        if feed.isActive || !feed.steps.isEmpty {
+            lines.append("""
+            LIVE — your browser actions are shown to the user as they happen
+            (\(feed.steps.count) step(s) so far, latest: \(feed.statusLine)).
+            They can watch you navigate, read, and download in the Web tab.
+            """)
+        }
+
         // GitHub
         let git = GitService.shared
         if git.hasToken {
@@ -68,13 +78,16 @@ enum AgentCapabilityBrief {
             """)
         }
 
-        // Linux VM
+        // Linux / execution
         lines.append("""
-        LINUX — there is no virtual machine. iOS enforces a hard rule against
-        third-party JIT: no emulator, no hypervisor, no fork/exec, so no Arch,
-        Debian, or any other distro can boot inside this app. Do not offer to
-        "spin up Linux". If the user needs a shell, point them at the GitHub
-        Actions job, which runs on a real Ubuntu runner, or at a paired Mac.
+        LINUX — no virtual machine is bundled in this build. \(CapabilityProbe.summary).
+        The app is sideload-only and carries the JIT entitlement, so executable
+        memory is available in a signing path that preserves it (TrollStore, or a
+        profile with get-task-allow). That is a prerequisite for an emulator, not
+        an emulator: there is no Arch or Debian image on this device and no
+        hypervisor. Do not claim to have started Linux. For real shell work, use
+        `shell` (audited commands above) or dispatch the Actions build, which is
+        a real Ubuntu runner.
         """)
 
         // Team and look

@@ -9,12 +9,9 @@ permissions:
   contents: write
 
 # Archives the app, packages an unsigned IPA, uploads it as a build artifact,
-# and attaches it to a GitHub Release tagged after the app's marketing version.
-#
-# The native inference frameworks (llama.xcframework, whisper) are NOT built
-# here: they are produced by scripts/build_native_frameworks.sh from submodules
-# and are gitignored. This job therefore runs only when the tracked project
-# builds without them, and reports clearly when it cannot — see the guard step.
+# and attaches it to a GitHub Release. Everything the archive needs — the pinned
+# submodules, the native xcframeworks built from them, the generated Xcode
+# project, and the pods — is produced on the runner, so this is the whole build.
 
 jobs:
   # Always runs. Parses every Swift source with the toolchain the runner already
@@ -46,37 +43,46 @@ jobs:
           done < <(find IOSLocalLLM CoreAIOnDeviceLAS -name '*.swift' -not -path '*/Vendor/*')
           exit $fail
 
-  # Archives only when the tracked project and the native inference frameworks
-  # are both present. The frameworks are gitignored build outputs, so a fork
-  # needs to run scripts/build_native_frameworks.sh on an Apple-silicon Mac once.
+  # Builds the gitignored native inference frameworks from the pinned
+  # submodules, regenerates the Xcode project, archives, and releases an
+  # unsigned IPA. This is the only job that produces an installable artifact.
   build:
     runs-on: macos-15
     needs: syntax
+    timeout-minutes: 180
     steps:
-      - name: Checkout
+      - name: Checkout with submodules
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
-          submodules: false
+          submodules: recursive
+          fetch-depth: 0
 
       - name: Select Xcode
-        run: sudo xcode-select -s /Applications/Xcode.app
-
-      - name: Check prerequisites
-        id: guard
         run: |
-          if [ -d "OnDeviceLAS.xcodeproj" ] \
-             && [ -d "ThirdParty/llama.cpp/build-apple/llama.xcframework" ]; then
-            echo "ready=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "ready=false" >> "$GITHUB_OUTPUT"
-            echo "::notice::Skipping the archive: OnDeviceLAS.xcodeproj or llama.xcframework is missing. Build the frameworks with scripts/build_native_frameworks.sh, then dispatch again."
-          fi
+          sudo xcode-select -s /Applications/Xcode.app
+          xcodebuild -version
+
+      - name: Install project tools
+        run: |
+          brew install xcodegen cocoapods cmake ninja || true
+          xcodegen --version
+          pod --version
+
+      - name: Build native frameworks
+        run: ./scripts/build_native_frameworks.sh --skip-whisper
+
+      - name: Generate the Xcode project
+        run: |
+          xcodegen generate
+          pod install
+
+      - name: List schemes
+        run: xcodebuild -workspace OnDeviceLAS.xcworkspace -list
 
       - name: Archive
-        if: steps.guard.outputs.ready == 'true'
         run: |
           xcodebuild \
-            -project OnDeviceLAS.xcodeproj \
+            -workspace OnDeviceLAS.xcworkspace \
             -scheme OnDeviceLAS \
             -configuration Release \
             -destination 'generic/platform=iOS' \
@@ -84,48 +90,49 @@ jobs:
             archive \
             CODE_SIGNING_ALLOWED=NO \
             CODE_SIGN_IDENTITY="" \
-            CODE_SIGNING_REQUIRED=NO
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_ENTITLEMENTS=""
 
       - name: Package unsigned IPA
-        if: steps.guard.outputs.ready == 'true'
         run: |
           mkdir -p Payload
           cp -R "build/LocalLLMSketch.xcarchive/Products/Applications/"*.app Payload/
           zip -qry LocalLLMSketch.ipa Payload
+          ls -la LocalLLMSketch.ipa
 
       - name: Read app version
         id: version
-        if: steps.guard.outputs.ready == 'true'
         run: |
           VERSION=$(/usr/libexec/PlistBuddy -c \
             "Print :CFBundleShortVersionString" \
             build/LocalLLMSketch.xcarchive/Products/Applications/*.app/Info.plist)
+          BUILD=$(/usr/libexec/PlistBuddy -c \
+            "Print :CFBundleVersion" \
+            build/LocalLLMSketch.xcarchive/Products/Applications/*.app/Info.plist)
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
-
-      - name: Determine release channel
-        id: channel
-        if: steps.guard.outputs.ready == 'true'
-        run: |
-          if [ "$GITHUB_REF_NAME" = "main" ]; then
-            echo "suffix=" >> "$GITHUB_OUTPUT"
-          else
-            echo "suffix=-preview" >> "$GITHUB_OUTPUT"
-          fi
+          echo "tag=v$VERSION-$BUILD" >> "$GITHUB_OUTPUT"
 
       - name: Upload IPA artifact
-        if: steps.guard.outputs.ready == 'true'
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: LocalLLMSketch-ipa${{ steps.channel.outputs.suffix }}
+          name: LocalLLMSketch-ipa
           path: LocalLLMSketch.ipa
           if-no-files-found: error
+          retention-days: 90
 
       - name: Attach IPA to GitHub release
-        if: steps.guard.outputs.ready == 'true'
         uses: softprops/action-gh-release@c062e08bd532815e2082a85e87e3ef29c3e6d191 # v2.5.0
         with:
-          tag_name: ${{ format('v{0}', steps.version.outputs.version) }}
-          name: ${{ format('Local LLM Sketch v{0}', steps.version.outputs.version) }}
-          body: Unsigned IPA built from ${{ github.ref_name }}. Re-sign it with your own certificate to install.
+          tag_name: ${{ steps.version.outputs.tag }}
+          name: ${{ format('Local LLM Sketch {0}', steps.version.outputs.tag) }}
+          body: |
+            Unsigned IPA built from `${{ github.ref_name }}` at ${{ github.sha }}.
+
+            Sideload it with AltStore, SideStore, Sideloadly, or TrollStore.
+            The build carries the JIT and increased-memory entitlements, so a
+            sideload that preserves entitlements (TrollStore, or a signing
+            profile with `get-task-allow`) keeps JIT enabled.
           files: LocalLLMSketch.ipa
           fail_on_unmatched_files: true
+          draft: false
+          prerelease: false

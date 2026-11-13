@@ -24,7 +24,7 @@ struct LocalAPIServerView: View {
     @State private var showingModelPicker = false
     @State private var showingDownloads = false
     @State private var lastLoggedModelState: CodingAssistantService.ServiceState?
-    @State private var topTab: LASTopTab = .chat
+    @ObservedObject private var router = TabRouter.shared
 
     var body: some View {
         NavigationStack {
@@ -33,9 +33,9 @@ struct LocalAPIServerView: View {
 
                 VStack(spacing: 0) {
                     LASHomeHeader()
-                    LASTopTabBar(selection: $topTab)
+                    LASTopTabBar()
 
-                    switch topTab {
+                    switch router.selection {
                     case .browser:
                         FocusBrowserView()
                     case .files:

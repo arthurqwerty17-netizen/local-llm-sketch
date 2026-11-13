@@ -1,38 +1,34 @@
 # Release verification
 
-Official releases contain source only. They do not contain an App Store build,
-signed IPA, generated native framework, or model weights.
+This fork publishes an **unsigned IPA** built by the `Build IPA` workflow. Upstream
+`Mesutcydev/ios-local-llm` published source-only releases; those instructions live
+in its own history and no longer describe what this repository releases.
 
-Starting with `v3.2.6`, the `Source release` GitHub Actions workflow creates a
-reproducible source archive from the tagged commit, publishes its SHA-256
-checksum, and records a GitHub artifact attestation backed by Sigstore.
+## What a release here contains
 
-## Download and verify
+- `LocalLLMSketch.ipa` — an unsigned iOS app archive built from the tagged commit.
+- The release tag is `v<marketing version>-<build number>`, taken from the built
+  app's `Info.plist`, so two builds of the same version never collide.
 
-Install the [GitHub CLI](https://cli.github.com/), then download a release:
+## Install
 
-```bash
-gh release download v3.2.6 \
-  --repo Mesutcydev/ios-local-llm \
-  --pattern 'ios-local-llm-*-source.tar.gz*'
-```
+The IPA is unsigned. Install it with AltStore, SideStore, Sideloadly, or
+TrollStore, which re-sign it for your device. The build declares the JIT and
+increased-memory entitlements; whether an install keeps them depends on the
+signer. The app reports the truth at runtime in Session and in the agent's brief.
 
-Verify its checksum:
-
-```bash
-shasum -a 256 \
-  --check ios-local-llm-3.2.6-source.tar.gz.sha256
-```
-
-Verify that GitHub Actions produced the archive from this repository:
+## Verify the download
 
 ```bash
-gh attestation verify \
-  ios-local-llm-3.2.6-source.tar.gz \
-  --repo Mesutcydev/ios-local-llm
+gh release download --repo arthurdcosta311-sketch/local-llm-sketch --pattern '*.ipa'
+shasum -a 256 LocalLLMSketch.ipa
 ```
 
-The attestation proves the workflow identity and artifact digest. It does not
-change the licenses of the source, dependencies, or separately downloaded
-models. Review `LICENSE`, `THIRD_PARTY_NOTICES.md`, and `PROVENANCE.md` before
-redistribution.
+Every release is built by the workflow in this repository from a commit on
+`main` or `preview`; the release body names the ref and the SHA.
+
+## What this does not change
+
+It says nothing about the licenses of the source, the dependencies, or the
+separately downloaded models. Review `LICENSE`, `THIRD_PARTY_NOTICES.md`, and
+`PROVENANCE.md` before redistribution.

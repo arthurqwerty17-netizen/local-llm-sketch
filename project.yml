@@ -149,9 +149,6 @@ targets:
       # Transparent Liquid Glass primitives (parity optical layer).
       - path: IOSLocalLLM/Views/GlassEffects.swift
       - path: IOSLocalLLM/Views/LiquidPinkBackdrop.swift
-      # The browsing agent's screen. Lives under Views/ (excluded wholesale
-      # above) but is part of this product's surface, like the two files above.
-      - path: IOSLocalLLM/Views/LASWebBrowseView.swift
       # Top tab shell, browser, files shelf, shell, GitHub, capability brief.
       - path: IOSLocalLLM/Views/LASTopTabBar.swift
       - path: IOSLocalLLM/Views/Browser
