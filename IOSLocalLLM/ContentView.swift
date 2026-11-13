@@ -374,6 +374,18 @@ private struct LASHomeHeader: View {
                         .contentShape(Rectangle())
                 }
                 .accessibilityLabel("Verbose terminal")
+
+                LASHomeHeaderDivider()
+
+                NavigationLink {
+                    LASGitHubView()
+                } label: {
+                    Image(systemName: "cat.fill")
+                        .font(.system(size: 18, weight: .semibold))
+                        .frame(maxWidth: .infinity, minHeight: 44)
+                        .contentShape(Rectangle())
+                }
+                .accessibilityLabel("GitHub")
             }
             .buttonStyle(.plain)
             .padding(.horizontal, 4)
