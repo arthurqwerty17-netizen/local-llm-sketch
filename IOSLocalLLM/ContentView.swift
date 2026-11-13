@@ -298,15 +298,15 @@ private struct LASHomeHeader: View {
                 // The two surfaces a session actually uses, kept out of the
                 // utility capsule so they stay one tap away.
                 HStack(spacing: 0) {
-                    NavigationLink {
-                        LASWebBrowseView()
+                    Button {
+                        router.show(.browser)
                     } label: {
                         Image(systemName: "globe")
                             .font(.system(size: 18, weight: .semibold))
                             .frame(width: 44, height: 44)
                             .contentShape(Rectangle())
                     }
-                    .accessibilityLabel("Web browsing")
+                    .accessibilityLabel("Web browser")
 
                     LASHomeHeaderDivider()
 
