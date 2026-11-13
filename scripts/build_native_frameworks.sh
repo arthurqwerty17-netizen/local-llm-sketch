@@ -27,16 +27,26 @@ git -C "$repository_root" submodule update --init --recursive
 
 llama_root="${repository_root}/ThirdParty/llama.cpp"
 llama_patch="${repository_root}/Patches/llama.cpp-ios-only-xcframework.patch"
+llama_ios_only=0
+
+if [[ ! -f "${llama_root}/build-xcframework.sh" ]]; then
+  echo "error: ThirdParty/llama.cpp is missing; run 'git submodule update --init'" >&2
+  exit 1
+fi
 
 if grep -q 'IOS_ONLY:-0' "${llama_root}/build-xcframework.sh"; then
   echo "==> llama.cpp iOS-only build support is already present"
+  llama_ios_only=1
 elif git -C "$llama_root" apply --check "$llama_patch" >/dev/null 2>&1; then
   echo "==> Applying the tracked llama.cpp iOS-only build patch"
   git -C "$llama_root" apply "$llama_patch"
+  llama_ios_only=1
 else
-  echo "error: the llama.cpp build patch does not match the pinned submodule" >&2
-  echo "       restore or inspect ThirdParty/llama.cpp/build-xcframework.sh" >&2
-  exit 1
+  # A submodule revision that does not match the tracked patch is still usable:
+  # the upstream script builds every slice, which takes longer but produces the
+  # iOS framework this target links. Warn instead of failing the build.
+  echo "warning: the llama.cpp build patch does not apply to this revision;" >&2
+  echo "         building all slices with the upstream script instead" >&2
 fi
 
 if [[ -e "${llama_root}/build-apple/llama.xcframework" ]]; then
@@ -50,7 +60,7 @@ if [[ -e "${repository_root}/ThirdParty/whisper.cpp/build-apple/whisper.xcframew
 fi
 
 echo "==> Building llama.cpp iOS XCFramework"
-(cd "$llama_root" && IOS_ONLY=1 ./build-xcframework.sh)
+(cd "$llama_root" && IOS_ONLY="$llama_ios_only" ./build-xcframework.sh)
 
 if [[ "$skip_whisper" == 0 ]]; then
   echo "==> Building whisper.cpp iOS XCFramework"
