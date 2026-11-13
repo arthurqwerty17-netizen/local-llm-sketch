@@ -25,10 +25,9 @@ The IPA is built by `Build IPA`, which checks out the submodules, builds
 `llama.xcframework`, runs `xcodegen generate` and `pod install`, archives,
 packages, and attaches the IPA to a release tagged `v<version>-<build>`.
 
-**That workflow needs a macOS runner, which a private repository on a free plan
-does not get.** If Releases is empty, read [Docs/CI.md](Docs/CI.md): making the
-repository public gives free macOS minutes, and the next push to `main` builds
-and releases it automatically.
+**That workflow needs a macOS runner.** It targets `macos-14` because the newest
+arm64 images are the most contended; if Releases is still empty, read
+[Docs/CI.md](Docs/CI.md) for the runner and billing options.
 
 ## What the assistant can do here
 

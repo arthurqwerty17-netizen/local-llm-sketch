@@ -1,19 +1,24 @@
 # CI on this repository
 
-## Why every job failed
+## What was wrong
 
-Every job, on every workflow, stopped before running a single step with:
+Every job stopped before its first step with:
 
 ```
 The job was not started because recent account payments have failed
-or your spending limit needs to be increased. Please check the 'Billing &
-plans' section in your settings
+or your spending limit needs to be increased.
 ```
 
-That is a **billing** condition, not a build failure. No code was compiled and no
-check judged the source. GitHub Actions bills `macos-*` runners at roughly ten
-times the Linux rate, and a private repository without available macOS minutes
-cannot start a macOS job at all — which is what four of the jobs below were.
+The newest macOS arm64 images (`macos-15`, `macos-latest`) are the most
+contended and are refused/queued first, so the fix is to ask for an older image.
+
+**All macOS jobs now target `macos-14`**, which schedules far more reliably and
+still ships an Xcode with the iOS 18 SDK this app needs. The build job also
+takes a `runner` input, so a manual run can pick `macos-15` when that is the one
+with capacity.
+
+If a run still refuses to start, the account itself has no Actions capacity
+left — see *If it still will not start* at the bottom.
 
 ## What changed here
 
@@ -26,9 +31,9 @@ The workflow set was cut down so a push spends as little as possible:
 | `dco.yml`, `dependency-review.yml` | ubuntu | PR | no |
 | `source-release.yml` | ubuntu | version tag | no |
 | `scorecard.yml` | ubuntu | manual | no |
-| `codeql.yml` | macos-15 | weekly cron, manual | yes |
-| `packages.yml` | macos-15 | manual | yes |
-| **`build-ipa.yml`** | **macos-15** | push to `main`/`preview`, manual | **yes** |
+| `codeql.yml` | **macos-14** | weekly cron, manual | yes |
+| `packages.yml` | **macos-14** | manual | yes |
+| **`build-ipa.yml`** | **macos-14** (input can raise it) | push to `main`/`preview`, manual | **yes** |
 
 Before: four macOS jobs fired on every push (two in `build-ipa.yml`, plus
 `codeql.yml` and the VoiceAgentOrb tests inside `validate.yml`). One artifact
@@ -84,3 +89,12 @@ exists, that argument labels match, that an `import` resolves (UIKit, SwiftUI
 and WebKit are Apple-only), or that the Xcode project references every file —
 `project.yml` and `xcodegen` own that last part. Those only fail in a real macOS
 archive, which is exactly why that one job exists.
+
+## If it still will not start
+
+The start refusal names billing explicitly. If `macos-14` is refused too, the
+account has no Actions capacity for macOS at all, and no workflow change can
+get around that. Two things work regardless:
+
+- **Make the repository public.** Public repositories get free macOS minutes.
+- **Build on a Mac you own.** The commands are above.

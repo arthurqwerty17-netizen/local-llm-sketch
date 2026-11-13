@@ -4,6 +4,11 @@ on:
   push:
     branches: [main, preview]
   workflow_dispatch:
+    inputs:
+      runner:
+        description: "Runner image (macos-14 or macos-15; macos-13 is too old for the iOS 18 SDK)"
+        required: false
+        default: macos-14
 
 permissions:
   contents: write
@@ -23,7 +28,11 @@ concurrency:
 
 jobs:
   build:
-    runs-on: macos-15
+    # macos-14 rather than macos-15/`macos-latest`. The newest arm64 images are
+    # the most contended and get queued first; the older image is easier to
+    # schedule and still ships an Xcode with the iOS 18 SDK this app targets.
+    # Override per run with the `runner` input.
+    runs-on: ${{ inputs.runner || 'macos-14' }}
     timeout-minutes: 300
     steps:
       - name: Checkout
@@ -32,15 +41,24 @@ jobs:
           submodules: recursive
           fetch-depth: 1
 
-      # Pick the newest installed Xcode rather than trusting the image default.
+      # Pick the newest installed Xcode. Older runner images default to an Xcode
+      # that predates the iOS 18 SDK, so choose explicitly and fail with a clear
+      # message when nothing suitable is installed.
       - name: Select Xcode
         run: |
           set -euo pipefail
+          echo "Available Xcodes:"
           ls -d /Applications/Xcode*.app 2>/dev/null || true
           latest=$(ls -d /Applications/Xcode*.app 2>/dev/null | sort -V | tail -1 || true)
           sudo xcode-select -s "${latest:-/Applications/Xcode.app}"
           xcodebuild -version
           swift --version
+          sdk=$(xcrun --sdk iphoneos --show-sdk-version 2>/dev/null || echo 0)
+          echo "iPhoneOS SDK: $sdk"
+          if [ "${sdk%%.*}" -lt 18 ]; then
+            echo "::error::This image has no iOS 18 SDK (found $sdk). Re-run with runner=macos-14 or macos-15."
+            exit 1
+          fi
 
       # Cheap gate: a syntax error in any Swift file would otherwise only appear
       # after the expensive native build.
