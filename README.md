@@ -70,22 +70,41 @@ performance evidence; see [validation policy](Docs/VALIDATION.md).
 - Accent and page-canvas color options on a purple default
 - iPhone and Apple-silicon Mac Catalyst targets
 
-## Browsing the web
+## Browser, Files, and GitHub
 
-The Web screen (globe in the home header) runs a small agent on top of the
-existing Web Tool. Given a question it searches, opens the top results, follows
-the same-site links that look relevant, sanitizes everything it reads for prompt
-injection, and returns one cited block. Given a link it reads that page.
+Three tabs sit under the header: **Chat**, **Web**, and **Files**.
 
-- **Automatic** control plans and stops on a deterministic policy, so it works
-  with any local model or with none loaded.
-- **Model-driven** control lets the local model choose the next URL through a
-  small JSON action protocol.
+**Web** is an in-app browser (WKWebView) with a content-rule tracker blocklist,
+a smart address bar, a **desktop mode** button, and downloads that land on the
+Files shelf. The assistant can read the page you are looking at and drive the
+same tab through the `browser_read`, `browser_navigate`, `browser_desktop_mode`
+and `browser_download` tools — that is what "the AI sees what you see" means
+here: the rendered text of the page, nothing from the network stack.
 
-The same pipeline is exposed to the assistant as the `web_browse` tool. Web
-Access must be allowed for a run to start, and the agent obeys the existing SSRF
-validator, robots policy, per-host rate limiter, size caps, and token budget. It
-does not log in, fill forms, or run page JavaScript.
+**Files** is the shelf. Downloads, files the assistant writes, and imports all
+land here, and everything on it is readable by the model (`files_list`,
+`files_read`, `files_write`). The panel also carries a small audited shell —
+`ls`, `cat`, `head`, `wc`, `grep`, `swift`, `git` — and the GitHub controls.
+
+**GitHub** links with a personal access token (repo scope, Keychain only). With
+a repository linked the assistant can list its tree, read a file, commit one
+file, dispatch the build workflow, and report the runs and releases that come
+back (`github_repo_files`, `github_read`, `github_commit`, `github_build`,
+`github_runs`).
+
+### What this device cannot do
+
+The assistant is told all of this up front, so it does not promise otherwise:
+
+- **No virtual machine.** iOS forbids third-party JIT and `fork`/`exec`, so no
+  Arch, Debian, or other Linux distro can boot inside this app. Use the Actions
+  job (a real Ubuntu runner) or a paired Mac.
+- **No compiler, package manager, or git binary on device.** `swift file.swift`
+  runs structural checks and says so; real builds run in CI.
+- **No extension bridge.** The browser does not run Chrome/Firefox extensions.
+
+The `Build IPA` workflow parses every Swift source on each push, then archives
+and releases an unsigned IPA only where the gitignored native frameworks exist.
 
 ## Keeping a session awake
 

@@ -7,6 +7,23 @@ and intends to use semantic version tags for source releases.
 
 ### Added
 
+- In-app browser (WKWebView) with a tracker blocklist, smart address bar,
+  desktop mode, downloads onto the Files shelf, and a readable page context for
+  the assistant.
+- Files shelf, viewer, and a small audited shell (`ls`, `cat`, `head`, `wc`,
+  `grep`, `swift`, `git`).
+- GitHub support: token in the Keychain, repository linking, tree and file
+  reads, single-file commits, workflow dispatch, runs and releases.
+- Assistant tools for the browser, the shelf, the shell, and GitHub, plus an
+  environment brief that tells the model what is wired and what cannot work
+  on iOS (no VM, no compiler, no fork/exec).
+- Chat / Web / Files tabs under the header.
+- Silver, Monochrome, and Electric accents.
+- `Build IPA` workflow: parses every Swift source on each push, then archives
+  and releases an unsigned IPA where the native frameworks are present.
+
+### Added
+
 - Browsing agent: a multi-page web reader that searches, opens pages, follows
   the most relevant same-site links, sanitizes what it reads, and returns one
   cited evidence block. Available from the new Web screen and as the
