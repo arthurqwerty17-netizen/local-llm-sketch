@@ -15,13 +15,23 @@ on:
       - "LICENSES/**"
       - ".github/ISSUE_TEMPLATE/**"
   workflow_dispatch:
+    inputs:
+      runner:
+        description: "Runner image. macos-13 schedules here; macos-14/15 need capacity or a paid plan."
+        type: choice
+        options:
+          - macos-13
+          - macos-14
+          - macos-15
+        default: macos-13
 
 permissions:
   contents: write
 
-# Runs on macos-14 rather than macos-15/`macos-latest`. The newest arm64 images
-# are the most contended and the first to be refused or queued; macos-14 still
-# ships an Xcode with the iOS 18 SDK this app targets.
+# Runs on macos-13. On this account `macos-14` resolves to a large arm64 SKU that
+# is not supported ("configuration 'macos-14-arm64-us-xl' is not supported") and
+# `macos-15` is refused for capacity, while macos-13 schedules. Pick a different
+# image from the runner dropdown when a newer one becomes available.
 #
 # One job, ordered cheapest-first so a mistake costs seconds rather than half an
 # hour: parse every Swift file, then build the native framework (cached), then
@@ -33,7 +43,7 @@ concurrency:
 
 jobs:
   build:
-    runs-on: macos-14
+    runs-on: ${{ inputs.runner || 'macos-13' }}
     timeout-minutes: 300
     steps:
       - name: Checkout
