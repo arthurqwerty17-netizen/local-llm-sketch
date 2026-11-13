@@ -152,7 +152,11 @@ struct BrowserAIPanel: View {
     }
 
     private func ask() async {
-        guard let context = await browser.pageContextBlock() as String? else { return }
+        let context = await browser.pageContextBlock()
+        guard !context.isEmpty else {
+            errorText = "No page is open in the browser."
+            return
+        }
         isThinking = true
         errorText = nil
         defer { isThinking = false }

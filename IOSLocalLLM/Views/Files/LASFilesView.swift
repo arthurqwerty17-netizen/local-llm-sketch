@@ -270,7 +270,7 @@ struct LASFileDetailView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            LASDetailHeader(entry.name) {
+            LASDetailHeader("File") {
                 Button {
                     store.delete(entry)
                     dismiss()
@@ -286,6 +286,11 @@ struct LASFileDetailView: View {
 
             ScrollView {
                 VStack(alignment: .leading, spacing: LASDesignTokens.component) {
+                    Text(entry.name)
+                        .font(.title3.weight(.semibold))
+                        .lineLimit(2)
+                        .truncationMode(.middle)
+
                     HStack(spacing: LASDesignTokens.row) {
                         LASMetricTile(
                             title: "size",
