@@ -53,9 +53,10 @@ jobs:
           fetch-depth: 1
 
       # Pick the newest installed Xcode. Older runner images default to an Xcode
-      # that predates the iOS 18 SDK, so choose explicitly and fail with a clear
-      # message when nothing suitable is installed.
+      # that predates the iOS 18 SDK, so choose explicitly and record what the
+      # image can actually do.
       - name: Select Xcode
+        id: xcode
         run: |
           set -euo pipefail
           echo "Available Xcodes:"
@@ -66,9 +67,10 @@ jobs:
           swift --version
           sdk=$(xcrun --sdk iphoneos --show-sdk-version 2>/dev/null || echo 0)
           echo "iPhoneOS SDK: $sdk"
+          echo "sdk=$sdk" >>"$GITHUB_OUTPUT"
+          echo "sdk_major=${sdk%%.*}" >>"$GITHUB_OUTPUT"
           if [ "${sdk%%.*}" -lt 18 ]; then
-            echo "::error::This image has no iOS 18 SDK (found $sdk). Re-run with runner=macos-14 or macos-15."
-            exit 1
+            echo "::warning::This image ships iOS SDK $sdk, below the project's 18.0 deployment target. The archive will retry with the deployment target lowered to $sdk."
           fi
 
       # Cheap gate: a syntax error in any Swift file would otherwise only appear
@@ -137,8 +139,20 @@ jobs:
       - name: List schemes
         run: xcodebuild -workspace OnDeviceLAS.xcworkspace -list
 
+      # Older images (macos-13) ship an iOS 17 SDK, and a project whose deployment
+      # target is 18.0 cannot be built against it. Rather than give up on the
+      # artifact, lower the deployment target to the SDK the image actually has
+      # and record that in the release notes. This is a sideload build: it does
+      # not have to satisfy an App Store deployment target.
       - name: Archive
         run: |
+          set -o pipefail
+          sdk_major="${{ steps.xcode.outputs.sdk_major }}"
+          target=""
+          if [ -n "$sdk_major" ] && [ "$sdk_major" -lt 18 ]; then
+            target="IPHONEOS_DEPLOYMENT_TARGET=${sdk_major}.0"
+            echo "::warning::Lowering deployment target to ${sdk_major}.0 for this image"
+          fi
           xcodebuild \
             -workspace OnDeviceLAS.xcworkspace \
             -scheme OnDeviceLAS \
@@ -149,7 +163,18 @@ jobs:
             CODE_SIGNING_ALLOWED=NO \
             CODE_SIGN_IDENTITY="" \
             CODE_SIGNING_REQUIRED=NO \
-            CODE_SIGN_ENTITLEMENTS=""
+            CODE_SIGN_ENTITLEMENTS="" \
+            $target 2>&1 | tee /tmp/archive.log
+
+      - name: Report compiler errors
+        if: failure()
+        run: |
+          {
+            echo "### Archive failed"
+            echo '```'
+            grep -E "error: " /tmp/archive.log | sort -u | head -60 || tail -80 /tmp/archive.log
+            echo '```'
+          } >>"$GITHUB_STEP_SUMMARY"
 
       - name: Package unsigned IPA
         run: |
