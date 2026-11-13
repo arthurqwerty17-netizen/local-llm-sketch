@@ -53,11 +53,7 @@ final class TabRouter: ObservableObject {
 struct LASTopTabBar: View {
 
     @ObservedObject private var router = TabRouter.shared
-
-    private var selection: Binding<LASTopTab> {
-        Binding(get: { router.selection }, set: { router.selection = $0 })
-    }
-
+    @ObservedObject private var feed = BrowserActivityFeed.shared
     @Environment(\.koduTheme) private var T
 
     var body: some View {
@@ -73,7 +69,7 @@ struct LASTopTabBar: View {
                         Text(tab.title)
                             .font(.caption.weight(.semibold))
                         // Live dot: the assistant is driving the browser.
-                        if tab == .browser, BrowserActivityFeed.shared.isActive {
+                        if tab == .browser, feed.isActive {
                             Circle()
                                 .fill(T.accentStrong)
                                 .frame(width: 5, height: 5)
