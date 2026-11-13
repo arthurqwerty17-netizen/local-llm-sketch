@@ -29,9 +29,14 @@ final class FocusBrowser: NSObject, ObservableObject {
     @Published private(set) var canGoBack = false
     @Published private(set) var canGoForward = false
     @Published private(set) var desktopMode: Bool = false
-    @Published private(set) var blockedCount: Int = 0
     @Published private(set) var lastDownloadName: String?
     @Published private(set) var lastError: String?
+
+    /// Bumped when the tracker blocklist finishes compiling. The browser view
+    /// keys on it: `WKWebViewConfiguration` is copied at init, so the rule list
+    /// has to be in the configuration *before* the web view is created, and the
+    /// view is rebuilt exactly once when the list becomes available.
+    @Published private(set) var blocklistVersion = 0
 
     /// Set by the view so navigation can happen from anywhere (FAB, AI, links).
     weak var webView: WKWebView?
@@ -42,6 +47,18 @@ final class FocusBrowser: NSObject, ObservableObject {
     private override init() {
         super.init()
         loadRuleList()
+    }
+
+    /// A configuration carrying the blocklist, if it has compiled yet.
+    func makeConfiguration() -> WKWebViewConfiguration {
+        let configuration = WKWebViewConfiguration()
+        configuration.allowsInlineMediaPlayback = true
+        configuration.defaultWebpagePreferences.allowsContentJavaScript = true
+        configuration.mediaTypesRequiringUserActionForPlayback = []
+        if let ruleList {
+            configuration.userContentController.add(ruleList)
+        }
+        return configuration
     }
 
     // MARK: - Tracker blocking
@@ -75,17 +92,12 @@ final class FocusBrowser: NSObject, ObservableObject {
             encodedContentRuleList: json
         ) { [weak self] list, _ in
             Task { @MainActor in
-                self?.ruleList = list
-                self?.applyRuleList()
+                guard let self, let list else { return }
+                self.ruleList = list
+                // Ask the view to rebuild with the list in its configuration.
+                self.blocklistVersion += 1
             }
         }
-    }
-
-    private func applyRuleList() {
-        guard let webView, let ruleList else { return }
-        let controller = webView.configuration.userContentController
-        controller.removeAllContentRuleLists()
-        controller.add(ruleList)
     }
 
     // MARK: - Wiring
@@ -93,9 +105,6 @@ final class FocusBrowser: NSObject, ObservableObject {
     /// Attaches the live web view. The view calls this once per view instance.
     func attach(_ webView: WKWebView) {
         self.webView = webView
-        if let ruleList {
-            webView.configuration.userContentController.add(ruleList)
-        }
         applyDesktopMode()
 
         observations = [

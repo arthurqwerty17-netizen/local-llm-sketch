@@ -48,7 +48,7 @@ struct FocusBrowserView: View {
                 Image(systemName: browser.currentURL?.scheme == "https"
                       ? "lock.fill" : "shield.lefthalf.filled")
                     .font(.system(size: 11, weight: .bold))
-                    .foregroundStyle(browser.blockedCount > 0 ? T.good : .secondary)
+                    .foregroundStyle(.secondary)
 
                 TextField("Search or enter address", text: $browser.addressText)
                     .font(.subheadline)
@@ -207,6 +207,9 @@ struct FocusBrowserView: View {
     private var page: some View {
         ZStack(alignment: .bottomTrailing) {
             BrowserWebView(browser: browser)
+                // Rebuild once when the tracker blocklist finishes compiling, so
+                // the rule list is in the web view's configuration from the start.
+                .id(browser.blocklistVersion)
 
             if browser.currentURL == nil {
                 emptyState
@@ -324,10 +327,11 @@ struct BrowserWebView: UIViewRepresentable {
     @ObservedObject var browser: FocusBrowser
 
     func makeUIView(context: Context) -> WKWebView {
-        let config = WKWebViewConfiguration()
-        config.allowsInlineMediaPlayback = true
-        config.defaultWebpagePreferences.allowsContentJavaScript = true
-        let webView = WKWebView(frame: .zero, configuration: config)
+        // The configuration carries the tracker blocklist, so it is built by the
+        // model rather than here. `WKWebViewConfiguration` is copied at init, so
+        // this view is keyed on `blocklistVersion` and rebuilt once when the
+        // rule list finishes compiling.
+        let webView = WKWebView(frame: .zero, configuration: browser.makeConfiguration())
         webView.navigationDelegate = context.coordinator
         webView.uiDelegate = context.coordinator
         webView.allowsBackForwardNavigationGestures = true
@@ -416,6 +420,9 @@ struct BrowserWebView: UIViewRepresentable {
         func downloadDidFinish(_ download: WKDownload) {
             Task { @MainActor in
                 await WorkspaceFileStore.shared.refreshAfterDownload()
+                if let newest = WorkspaceFileStore.shared.entries.first {
+                    browser.noteDownload(named: newest.name)
+                }
             }
         }
 
