@@ -22,8 +22,8 @@ brew install cmake xcodegen cocoapods
 The llama.cpp and whisper.cpp sources are Git submodules:
 
 ```bash
-git clone --recurse-submodules https://github.com/Mesutcydev/ios-local-llm.git
-cd ios-local-llm
+git clone --recurse-submodules https://github.com/arthurdcosta311-sketch/local-llm-sketch.git
+cd local-llm-sketch
 ```
 
 If the repository was cloned without submodules:
@@ -41,7 +41,9 @@ root script builds the native slices from pinned submodules:
 ./scripts/build_native_frameworks.sh
 ```
 
-Add `--with-catalyst` when you also need the Apple-Silicon Mac Catalyst target.
+Add `--with-catalyst` when you also need the Apple-Silicon Mac Catalyst target,
+and `--skip-whisper` to skip the whisper.cpp slice (the server target does not
+link it; CI uses this).
 The script may apply the tracked iOS-only patch inside the generated
 llama.cpp build checkout; do not commit that submodule worktree change.
 

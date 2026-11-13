@@ -1,37 +1,43 @@
-# OnDevice LLM
+# Local LLM Sketch
 
-> OnDevice LLM is a Swift/SwiftUI local-first AI workbench for
-> iPhone and Apple silicon Macs. Run language, vision, speech, and
-> image-generation models on-device, with optional authenticated local APIs for
-> AI clients and agents.
+> Local LLM Sketch is a sideload-only fork of OnDevice LLM: a Swift/SwiftUI
+> local-first AI workbench for iPhone, with an in-app browser the assistant can
+> drive. Run language, vision, speech, and image-generation models on-device,
+> with optional authenticated local APIs for AI clients and agents.
 
-Product name: OnDevice LLM
-Product line: OnDevice
-Repository: https://github.com/Mesutcydev/ios-local-llm
-Website: https://mesutcydev.github.io/ios-local-llm/
+Product name: Local LLM Sketch
+Repository: https://github.com/arthurdcosta311-sketch/local-llm-sketch
 License: MIT for original project code and documentation
-Swift module and Xcode scheme: IOSLocalLLM
+Xcode target and scheme: OnDeviceLAS
+Upstream project (not this fork): OnDevice LLM, https://github.com/Mesutcydev/ios-local-llm
 
-## OnDevice product line
+## Tools the assistant has here
 
-- OnDevice LLM — main open-source workbench (this repository)
-- OnDevice Local API Server — coming soon
-- OnDevice CoreAI Local API Server — beta
+- browser_read, browser_navigate, browser_desktop_mode, browser_download
+- files_list, files_read, files_write
+- shell (ls, cat, head, wc, grep, swift, git — audited, no fork/exec)
+- github_repo_files, github_read, github_commit, github_build, github_runs
+- web_search, web_browse
 
-## Primary documentation
+## What is not available
 
-- [Project overview](https://github.com/Mesutcydev/ios-local-llm/blob/main/README.md)
-- [Coding-agent instructions](https://github.com/Mesutcydev/ios-local-llm/blob/main/AGENTS.md)
-- [Architecture](https://github.com/Mesutcydev/ios-local-llm/blob/main/ARCHITECTURE.md)
-- [Reusable component catalog](https://github.com/Mesutcydev/ios-local-llm/blob/main/Docs/REUSABLE_COMPONENTS.md)
-- [Coding-agent implementation handoff](https://github.com/Mesutcydev/ios-local-llm/blob/main/Docs/CODING_AGENT_IMPLEMENTATION.md)
-- [Local runtime foundation notes](https://github.com/Mesutcydev/ios-local-llm/blob/main/IOSLocalLLM/LocalAIRuntimeFoundation/README.md)
-- [Development setup](https://github.com/Mesutcydev/ios-local-llm/blob/main/SETUP_INSTRUCTIONS.md)
-- [Agent and local API integration](https://github.com/Mesutcydev/ios-local-llm/blob/main/Docs/AGENT_INTEGRATION.md)
-- [Contributing](https://github.com/Mesutcydev/ios-local-llm/blob/main/CONTRIBUTING.md)
-- [Security policy](https://github.com/Mesutcydev/ios-local-llm/blob/main/SECURITY.md)
-- [Third-party notices](https://github.com/Mesutcydev/ios-local-llm/blob/main/THIRD_PARTY_NOTICES.md)
-- [Structured metadata](https://github.com/Mesutcydev/ios-local-llm/blob/main/codemeta.json)
+- No Linux virtual machine (no hypervisor, no JIT-backed emulator bundled).
+- No on-device compiler, package manager, or git binary.
+- No Chrome/Firefox extension bridge in the browser.
+
+## Documentation
+
+- [Project overview](https://github.com/arthurdcosta311-sketch/local-llm-sketch/blob/main/README.md)
+- [Coding-agent instructions](https://github.com/arthurdcosta311-sketch/local-llm-sketch/blob/main/AGENTS.md)
+- [Architecture](https://github.com/arthurdcosta311-sketch/local-llm-sketch/blob/main/ARCHITECTURE.md)
+- [Reusable component catalog](https://github.com/arthurdcosta311-sketch/local-llm-sketch/blob/main/Docs/REUSABLE_COMPONENTS.md)
+- [Local runtime foundation notes](https://github.com/arthurdcosta311-sketch/local-llm-sketch/blob/main/IOSLocalLLM/LocalAIRuntimeFoundation/README.md)
+- [Development setup](https://github.com/arthurdcosta311-sketch/local-llm-sketch/blob/main/SETUP_INSTRUCTIONS.md)
+- [Agent and local API integration](https://github.com/arthurdcosta311-sketch/local-llm-sketch/blob/main/Docs/AGENT_INTEGRATION.md)
+- [Release verification](https://github.com/arthurdcosta311-sketch/local-llm-sketch/blob/main/Docs/RELEASE_VERIFICATION.md)
+- [Contributing](https://github.com/arthurdcosta311-sketch/local-llm-sketch/blob/main/CONTRIBUTING.md)
+- [Security policy](https://github.com/arthurdcosta311-sketch/local-llm-sketch/blob/main/SECURITY.md)
+- [Third-party notices](https://github.com/arthurdcosta311-sketch/local-llm-sketch/blob/main/THIRD_PARTY_NOTICES.md)
 
 ## Capabilities
 

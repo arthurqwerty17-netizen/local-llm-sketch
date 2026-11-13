@@ -18,9 +18,11 @@ enum LegalDocuments {
     static let currentVersion = 4
 
     // MARK: - Public URLs
-    static let privacyPolicyURL = "https://github.com/Mesutcydev/ios-local-llm/blob/main/PRIVACY_POLICY.md"
-    static let eulaURL          = "https://github.com/Mesutcydev/ios-local-llm/blob/main/LICENSE"
-    static let supportURL       = "https://github.com/Mesutcydev/ios-local-llm/issues"
+    // Point at this fork, which is where the shipped build's source and issues
+    // actually live. The upstream project keeps its own copies.
+    static let privacyPolicyURL = "https://github.com/arthurdcosta311-sketch/local-llm-sketch/blob/main/PRIVACY_POLICY.md"
+    static let eulaURL          = "https://github.com/arthurdcosta311-sketch/local-llm-sketch/blob/main/LICENSE"
+    static let supportURL       = "https://github.com/arthurdcosta311-sketch/local-llm-sketch/issues"
 
     // MARK: - Privacy Policy
 

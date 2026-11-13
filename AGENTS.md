@@ -5,11 +5,14 @@ submodules that provide their own `AGENTS.md`.
 
 ## Project identity
 
-- Repository: **iOS Local LLM**
-- App/product names found in source: **IOSLocalLLM** and **iOS Local LLM**
-- Purpose: a local-first Swift/SwiftUI AI workbench for iPhone and Apple
-  silicon Macs
-- Repository: <https://github.com/Mesutcydev/ios-local-llm>
+- Repository: **Local LLM Sketch** (`arthurdcosta311-sketch/local-llm-sketch`)
+- App/product name: **Local LLM Sketch**; the Xcode target and scheme are still
+  `OnDeviceLAS` so the generated project keeps working
+- Purpose: a sideload-only, local-first Swift/SwiftUI AI workbench for iPhone,
+  with an in-app browser the assistant can drive
+- Repository: <https://github.com/arthurdcosta311-sketch/local-llm-sketch>
+- Upstream (not this fork): OnDevice LLM,
+  <https://github.com/Mesutcydev/ios-local-llm>
 - License: MIT for original project code and documentation; third-party code,
   assets, and downloaded models keep their own licenses
 
