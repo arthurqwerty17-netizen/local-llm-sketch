@@ -160,7 +160,10 @@ struct KoduTheme {
         // reserved for status). Listed first so it leads the Settings swatch
         // row. `system` (vivid iOS blue) and the rest stay selectable.
         // rawValues are persisted, so the order may change freely.
-        case onyx, system, rose, blue, violet, emerald, amber, graphite, teal, indigo, coral, magenta
+        // `plum` is the Local LLM Sketch signature purple and the default; the
+        // other violet-family entries stay available so a user can keep a
+        // softer or dirtier purple without leaving the brand family.
+        case onyx, system, rose, blue, violet, plum, orchid, lilac, emerald, amber, graphite, teal, indigo, coral, magenta
         var id: String { rawValue }
         var displayName: String {
             switch self {
@@ -169,6 +172,9 @@ struct KoduTheme {
             case .rose: return "Rose"
             case .blue: return "Blue"
             case .violet: return "Violet"
+            case .plum: return "Plum"
+            case .orchid: return "Orchid"
+            case .lilac: return "Lilac"
             case .emerald: return "Emerald"
             case .amber: return "Amber"
             case .graphite: return "Graphite"
@@ -256,20 +262,104 @@ struct KoduTheme {
                 return dark
                     ? (c(0.92,0.40,0.85), c(0.97,0.54,0.90), c(0.86,0.30,0.78), c(0.95,0.44,0.88))
                     : (c(0.78,0.16,0.66), c(0.82,0.22,0.70), c(0.64,0.08,0.54), c(0.72,0.12,0.60))
+            case .plum:
+                // Signature purple — #6B3CE9 at full strength in light, and a
+                // lifted lilac-leaning violet in dark so the accent still reads
+                // as ink on a near-black page. `strong` keeps white button text
+                // above 4.5:1 in both appearances.
+                return dark
+                    ? (c(0.662,0.529,1.000), c(0.745,0.627,1.000), c(0.553,0.412,0.980), c(0.612,0.470,0.988))
+                    : (c(0.420,0.235,0.914), c(0.549,0.361,0.980), c(0.302,0.141,0.722), c(0.361,0.188,0.847))
+            case .orchid:
+                return dark
+                    ? (c(0.816,0.549,1.000), c(0.871,0.659,1.000), c(0.741,0.451,0.976), c(0.784,0.502,0.988))
+                    : (c(0.584,0.220,0.776), c(0.663,0.318,0.851), c(0.478,0.141,0.667), c(0.529,0.169,0.718))
+            case .lilac:
+                return dark
+                    ? (c(0.776,0.702,1.000), c(0.827,0.769,1.000), c(0.694,0.612,0.980), c(0.745,0.671,0.992))
+                    : (c(0.427,0.325,0.784), c(0.486,0.384,0.831), c(0.341,0.243,0.667), c(0.384,0.282,0.718))
             }
         }
     }
 
-    /// The only app-facing accent for now. Keeping the palette implementation
-    /// below makes it easy to restore user-selectable colors later without
-    /// allowing an old persisted choice to override the current black theme.
-    static let appAccent: KoduAccent = .onyx
+    /// Default brand accent for a fresh install — the Local LLM Sketch purple.
+    /// Still only a default: a persisted user choice always wins.
+    static let appAccent: KoduAccent = .plum
 
-    /// Build a theme for an appearance + accent palette. `appearance` is the
-    /// stored string — "light", "dark", or "oled". `.rose` is the untouched
-    /// default; other palettes substitute only the brand-accent family.
+    /// Page-canvas tint.
+    ///
+    /// `KoduAccent` recolors brand actions and status glyphs; a canvas recolors
+    /// the page itself — the `bg` layer the ambient backdrop paints behind the
+    /// glass. Kept as its own axis so picking a canvas can never move ink
+    /// contrast, the semantic good/warn/bad colors, or the OLED true-black page.
+    enum KoduCanvas: String, CaseIterable, Identifiable, Sendable {
+        case neutral, lavender, plum, midnight
+
+        var id: String { rawValue }
+
+        var displayName: String {
+            switch self {
+            case .neutral:  return "Neutral"
+            case .lavender: return "Lavender"
+            case .plum:     return "Plum"
+            case .midnight: return "Midnight"
+            }
+        }
+
+        var detail: String {
+            switch self {
+            case .neutral:  return "Cool pearl"
+            case .lavender: return "Soft violet wash"
+            case .plum:     return "Purple dusk"
+            case .midnight: return "Inked slate"
+            }
+        }
+
+        var symbol: String {
+            switch self {
+            case .neutral:  return "square"
+            case .lavender: return "square.split.diagonal.2x2"
+            case .plum:     return "moonphase.waxing.gibbous"
+            case .midnight: return "moon.haze"
+            }
+        }
+
+        /// Page fill for the light appearance. Each stop is a literal color
+        /// rather than a blend, so the choice renders exactly as previewed.
+        var lightPage: Color {
+            switch self {
+            case .neutral:  return Color(red: 0.968, green: 0.976, blue: 0.992)
+            case .lavender: return Color(red: 0.949, green: 0.945, blue: 0.988)
+            case .plum:     return Color(red: 0.957, green: 0.929, blue: 0.976)
+            case .midnight: return Color(red: 0.906, green: 0.914, blue: 0.957)
+            }
+        }
+
+        /// Page fill for the dark appearance. Kept above pure black so clear
+        /// glass reads as smoked crystal instead of a flat void.
+        var darkPage: Color {
+            switch self {
+            case .neutral:  return Color(red: 0.140, green: 0.155, blue: 0.190)
+            case .lavender: return Color(red: 0.137, green: 0.133, blue: 0.204)
+            case .plum:     return Color(red: 0.129, green: 0.098, blue: 0.180)
+            case .midnight: return Color(red: 0.071, green: 0.078, blue: 0.129)
+            }
+        }
+
+        func page(dark: Bool) -> Color { dark ? darkPage : lightPage }
+    }
+
+    /// Build a theme for an appearance + accent palette + page canvas.
+    /// `appearance` is the stored string — "light", "dark", or "oled". The
+    /// accent substitutes only the brand-accent family; the canvas substitutes
+    /// only the page fill. The default canvas keeps every existing call site
+    /// byte-for-byte identical.
     /// Applied at the root scene + tabs so the choice is app-wide.
-    static func make(appearance: String, accent: KoduAccent) -> KoduTheme {
+    static func make(
+        appearance: String,
+        accent: KoduAccent,
+        canvas: KoduCanvas = .neutral
+    ) -> KoduTheme {
         let base: KoduTheme
         switch appearance {
         case "oled": base = .oled
@@ -283,8 +373,11 @@ struct KoduTheme {
         // shortcut made the Rose swatch paint blue. Rose now uses its pink
         // anchors to match the swatch shown in the picker.
         let a = accent.anchors(dark: dark)
+        // The OLED appearance is defined by its true-black page; a canvas tint
+        // would defeat that (and cost the battery saving), so it keeps its own.
+        let page = base.isOLED ? base.bg : canvas.page(dark: dark)
         return KoduTheme(
-            bg: base.bg, surface: base.surface, surface2: base.surface2, surface3: base.surface3,
+            bg: page, surface: base.surface, surface2: base.surface2, surface3: base.surface3,
             ink: base.ink, ink2: base.ink2, ink3: base.ink3, ink4: base.ink4,
             rule: base.rule, rule2: base.rule2,
             accent: a.accent,

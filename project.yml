@@ -149,12 +149,15 @@ targets:
       # Transparent Liquid Glass primitives (parity optical layer).
       - path: IOSLocalLLM/Views/GlassEffects.swift
       - path: IOSLocalLLM/Views/LiquidPinkBackdrop.swift
+      # The browsing agent's screen. Lives under Views/ (excluded wholesale
+      # above) but is part of this product's surface, like the two files above.
+      - path: IOSLocalLLM/Views/LASWebBrowseView.swift
     resources:
       - path: IOSLocalLLM/PrivacyInfo.xcprivacy
     info:
       path: IOSLocalLLM/Info.plist
       properties:
-        CFBundleDisplayName: "On Device: LAS"
+        CFBundleDisplayName: "Local LLM Sketch"
         # Source of truth for both targets' marketing version. xcodegen
         # writes these into the generated Info.plist files on every run,
         # so hand-edits to those plists get reverted next regen — always
@@ -164,7 +167,13 @@ targets:
         # Standard HTTPS only — answers the ASC export-compliance question
         # automatically so review submission doesn't stall on it.
         ITSAppUsesNonExemptEncryption: false
-        NSLocalNetworkUsageDescription: "On Device: LAS exposes your selected on-device language model to trusted computers on your local network."
+        NSLocalNetworkUsageDescription: "Local LLM Sketch exposes your selected on-device language model to trusted computers on your local network."
+        # Keep-awake "Screen + background" mode. iOS needs the location
+        # background mode for a coarse session that keeps a long local
+        # generation alive with the screen off; no coordinate is stored or sent.
+        NSLocationWhenInUseUsageDescription: "Keeps a long local generation and your local API node running while the screen is off. No location is stored or sent, and the session only starts when you choose Screen + background in Session settings."
+        UIBackgroundModes:
+          - location
         UIRequiresFullScreen: true
         UIStatusBarStyle: UIStatusBarStyleDarkContent
         UIViewControllerBasedStatusBarAppearance: false
@@ -316,6 +325,10 @@ targets:
       - path: IOSLocalLLM/Models/KoduTheme.swift
       - path: IOSLocalLLM/LASDesignSystem.swift
       - path: IOSLocalLLM/LASTheme.swift
+      # Keep-awake ownership. `LocalAPIServer.swift` (shared) routes the idle
+      # timer through this service, so the Core AI target compiles it too —
+      # with its own settings keys and no session UI.
+      - path: IOSLocalLLM/Services/KeepAwakeService.swift
       - path: IOSLocalLLM/Views/LiveParserBar.swift
       - path: IOSLocalLLM/Services/ToastCenter.swift
       - path: IOSLocalLLM/RuntimeTerminalView.swift

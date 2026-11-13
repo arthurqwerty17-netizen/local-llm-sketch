@@ -36,20 +36,7 @@ struct LASOnboardingView: View {
 
     private var header: some View {
         HStack(spacing: LASDesignTokens.row) {
-            Image("app_logo_small")
-                .resizable()
-                .scaledToFit()
-                .frame(width: 38, height: 38)
-                .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
-
-            VStack(alignment: .leading, spacing: 2) {
-                Text("On Device : LAS")
-                    .font(.headline.weight(.semibold))
-                Text("LOCAL API SERVER")
-                    .font(.caption2.weight(.bold).monospaced())
-                    .tracking(0.8)
-                    .foregroundStyle(.secondary)
-            }
+            LASBrandLockup(size: 38)
 
             Spacer()
 
@@ -149,10 +136,7 @@ private struct LASOnboardingStoryPage: View {
                     RoundedRectangle(cornerRadius: 24, style: .continuous)
                         .fill(T.accentStrong)
                     if item.usesLogo {
-                        Image("app_logo_small")
-                            .resizable()
-                            .scaledToFit()
-                            .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
+                        LASLogoMark(size: 92, cornerFraction: 0.245)
                     } else {
                         Image(systemName: item.symbol)
                             .font(.system(size: 38, weight: .medium))

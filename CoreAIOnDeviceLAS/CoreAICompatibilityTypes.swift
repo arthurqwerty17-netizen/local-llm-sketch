@@ -311,6 +311,13 @@ final class AppSettings: ObservableObject {
     // run; LASThemeHost resolves "system" through LASAppearance.
     @AppStorage("coreAI.appearance") var appearance: String = "system"
     @AppStorage("coreAI.themeAccent") var themeAccent: String = KoduTheme.appAccent.rawValue
+    @AppStorage("coreAI.canvasTint") var canvasTint: String = KoduTheme.KoduCanvas.neutral.rawValue
+    // Read by KeepAwakeService, which the shared LocalAPIServer uses to own
+    // the idle timer. This product has no session UI, so it stays at the
+    // default and the server's own keep-awake switch behaves as before.
+    @AppStorage("coreAI.keepAwakeMode") var keepAwakeMode: String = KeepAwakeMode.off.rawValue
+    @AppStorage("coreAI.keepAwakeLocationArmed") var keepAwakeLocationArmed: Bool = true
+    @AppStorage("coreAI.keepAwakeDuringGeneration") var keepAwakeDuringGeneration: Bool = true
 
     var resolvedColorScheme: ColorScheme? {
         (LASAppearance(rawValue: appearance) ?? .system).colorScheme

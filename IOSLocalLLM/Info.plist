@@ -5,7 +5,7 @@
 	<key>CFBundleDevelopmentRegion</key>
 	<string>$(DEVELOPMENT_LANGUAGE)</string>
 	<key>CFBundleDisplayName</key>
-	<string>On Device: LAS</string>
+	<string>Local LLM Sketch</string>
 	<key>CFBundleExecutable</key>
 	<string>$(EXECUTABLE_NAME)</string>
 	<key>CFBundleIdentifier</key>
@@ -25,7 +25,13 @@
 	<key>LSSupportsOpeningDocumentsInPlace</key>
 	<true/>
 	<key>NSLocalNetworkUsageDescription</key>
-	<string>On Device: LAS exposes your selected on-device language model to trusted computers on your local network.</string>
+	<string>Local LLM Sketch exposes your selected on-device language model to trusted computers on your local network.</string>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>Keeps a long local generation and your local API node running while the screen is off. No location is stored or sent, and the session is only started when you choose Screen + background in Session settings.</string>
+	<key>UIBackgroundModes</key>
+	<array>
+		<string>location</string>
+	</array>
 	<key>UIApplicationSceneManifest</key>
 	<dict>
 		<key>UIApplicationSupportsMultipleScenes</key>

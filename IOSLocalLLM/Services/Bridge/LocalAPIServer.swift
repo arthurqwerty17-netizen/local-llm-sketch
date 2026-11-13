@@ -5623,8 +5623,12 @@ final class LocalAPIManager: ObservableObject {
     }
 
     private func updateIdleTimer(running: Bool) {
-        UIApplication.shared.isIdleTimerDisabled =
-            running && AppSettings.shared.localAPIKeepScreenAwake
+        // The server's own "keep screen awake" switch is one lease among
+        // several; KeepAwakeService owns `isIdleTimerDisabled` so a second
+        // feature holding the app awake is never clobbered by this one ending.
+        KeepAwakeService.shared.setServerLease(
+            active: running && AppSettings.shared.localAPIKeepScreenAwake
+        )
     }
 
     private func scheduleRecovery() {

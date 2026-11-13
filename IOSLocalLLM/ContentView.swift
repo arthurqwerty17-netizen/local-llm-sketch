@@ -271,12 +271,44 @@ struct LocalAPIServerView: View {
 
 private struct LASHomeHeader: View {
     var body: some View {
-        HStack(spacing: LASDesignTokens.row) {
-            Text("On Device : LAS")
-                .font(.title3.weight(.bold))
-                .lineLimit(1)
+        VStack(spacing: LASDesignTokens.tight) {
+            HStack(spacing: LASDesignTokens.row) {
+                LASBrandLockup(size: 32)
 
-            Spacer(minLength: LASDesignTokens.tight)
+                Spacer(minLength: LASDesignTokens.tight)
+
+                // The two surfaces a session actually uses, kept out of the
+                // utility capsule so they stay one tap away.
+                HStack(spacing: 0) {
+                    NavigationLink {
+                        LASWebBrowseView()
+                    } label: {
+                        Image(systemName: "globe")
+                            .font(.system(size: 18, weight: .semibold))
+                            .frame(width: 44, height: 44)
+                            .contentShape(Rectangle())
+                    }
+                    .accessibilityLabel("Web browsing")
+
+                    LASHomeHeaderDivider()
+
+                    NavigationLink {
+                        LASSessionSettingsView()
+                    } label: {
+                        Image(systemName: "bolt.badge.clock")
+                            .font(.system(size: 18, weight: .semibold))
+                            .frame(width: 44, height: 44)
+                            .contentShape(Rectangle())
+                    }
+                    .accessibilityLabel("Session and keep awake")
+                }
+                .buttonStyle(.plain)
+                .padding(.horizontal, 4)
+                .glassSurface(.capsule)
+                .overlay {
+                    Capsule().stroke(LASDesignTokens.hairline, lineWidth: 1)
+                }
+            }
 
             HStack(spacing: 0) {
                 NavigationLink {
@@ -284,7 +316,7 @@ private struct LASHomeHeader: View {
                 } label: {
                     Image(systemName: "paintpalette")
                         .font(.system(size: 18, weight: .semibold))
-                        .frame(width: 44, height: 44)
+                        .frame(maxWidth: .infinity, minHeight: 44)
                         .contentShape(Rectangle())
                 }
                 .accessibilityLabel("Theme")
@@ -296,7 +328,7 @@ private struct LASHomeHeader: View {
                 } label: {
                     Image(systemName: "arrow.down.circle")
                         .font(.system(size: 18, weight: .semibold))
-                        .frame(width: 44, height: 44)
+                        .frame(maxWidth: .infinity, minHeight: 44)
                         .contentShape(Rectangle())
                 }
                 .accessibilityLabel("Model downloads")
@@ -308,7 +340,7 @@ private struct LASHomeHeader: View {
                 } label: {
                     Image(systemName: "ladybug")
                         .font(.system(size: 18, weight: .semibold))
-                        .frame(width: 44, height: 44)
+                        .frame(maxWidth: .infinity, minHeight: 44)
                         .contentShape(Rectangle())
                 }
                 .accessibilityLabel("On-device debugger")
@@ -320,7 +352,7 @@ private struct LASHomeHeader: View {
                 } label: {
                     Image(systemName: "terminal")
                         .font(.system(size: 18, weight: .semibold))
-                        .frame(width: 44, height: 44)
+                        .frame(maxWidth: .infinity, minHeight: 44)
                         .contentShape(Rectangle())
                 }
                 .accessibilityLabel("Verbose terminal")
@@ -333,7 +365,7 @@ private struct LASHomeHeader: View {
             }
         }
         .padding(.horizontal, LASDesignTokens.pageInset)
-        .frame(minHeight: 64)
+        .padding(.vertical, LASDesignTokens.tight)
         .background(.ultraThinMaterial.opacity(0.55))
     }
 }

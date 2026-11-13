@@ -223,6 +223,21 @@ final class AppSettings: ObservableObject {
     @AppStorage("appearance")              var appearance: String = "system"
     /// Selected brand-accent palette; the rawValue of `KoduTheme.KoduAccent`.
     @AppStorage("themeAccent")             var themeAccent: String = KoduTheme.appAccent.rawValue
+    /// Selected page-canvas tint; the rawValue of `KoduTheme.KoduCanvas`.
+    /// Separate from `themeAccent` so a page color never changes ink contrast.
+    @AppStorage("canvasTint")              var canvasTint: String = KoduTheme.KoduCanvas.neutral.rawValue
+
+    // MARK: - Keep awake
+    /// How the app keeps itself alive for long on-device work. The rawValue of
+    /// `KeepAwakeMode`: "off", "screen", or "screenAndLocation".
+    @AppStorage("keepAwakeMode")           var keepAwakeMode: String = KeepAwakeMode.off.rawValue
+    /// Start the low-power location keep-alive automatically whenever a keep-
+    /// awake lease is active and the mode allows it. When false the user has to
+    /// arm it from Session settings each launch.
+    @AppStorage("keepAwakeLocationArmed")  var keepAwakeLocationArmed: Bool = true
+    /// Hold a keep-awake lease while a chat reply or a local API request is
+    /// generating, so a long generation is not interrupted by Auto-Lock.
+    @AppStorage("keepAwakeDuringGeneration") var keepAwakeDuringGeneration: Bool = true
 
     /// SwiftUI color scheme for the chosen appearance. Both "dark" and "oled"
     /// resolve to `.dark`; only "light" is light. "system" resolves to nil so

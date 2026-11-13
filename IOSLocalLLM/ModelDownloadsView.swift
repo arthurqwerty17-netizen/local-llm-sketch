@@ -128,7 +128,7 @@ struct LASModelDownloadsView: View {
             LASHFTokenSettingsView()
         }
         .sheet(isPresented: $showDocumentsImporter) {
-            LocalModelDocumentsImportSheet(appDocumentsName: "On Device: LAS") { url in
+            LocalModelDocumentsImportSheet(appDocumentsName: "Local LLM Sketch") { url in
                 showDocumentsImporter = false
                 Task { await importModel(at: url) }
             }
@@ -543,7 +543,7 @@ private struct LASModelLibraryCard: View {
 
             Text(appDocumentsPreferred
                  ? "Sideload build: Files folder-picking is unavailable here — use App Documents."
-                 : "Files → On My iPhone → On Device: LAS")
+                 : "Files → On My iPhone → Local LLM Sketch")
                 .font(.caption.monospaced())
                 .foregroundStyle(.secondary)
 

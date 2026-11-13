@@ -1,8 +1,9 @@
-# OnDevice LLM
+# Local LLM Sketch
 
 **Run open-source LLMs on iPhone offline** — chat, vision, voice, RAG, and an
-authenticated local API. Built in SwiftUI with MLX, llama.cpp, whisper.cpp, and
-Core ML. Local chat works without an OnDevice account. See the
+authenticated local API, with an optional browsing agent that reads the web for
+you. Built in SwiftUI with MLX, llama.cpp, whisper.cpp, and Core ML. Local chat
+works without an account. See the
 [privacy policy](PRIVACY_POLICY.md) for optional network features.
 
 [![Validate](https://github.com/Mesutcydev/ios-local-llm/actions/workflows/validate.yml/badge.svg)](https://github.com/Mesutcydev/ios-local-llm/actions/workflows/validate.yml)
@@ -16,7 +17,7 @@ Core ML. Local chat works without an OnDevice account. See the
 > Part of the **OnDevice** product line. Independent open-source project — not
 > affiliated with or endorsed by Apple Inc.
 
-**OnDevice LLM** (this repo) is the main local-first AI workbench
+**Local LLM Sketch** (this repo, formerly OnDevice LLM) is the main local-first AI workbench
 for iPhone and Apple silicon Macs. It runs language, vision, speech, and
 image-generation models on the device, and exposes opt-in OpenAI-, Anthropic-,
 and Ollama-compatible local APIs with structured tool calling and a paired Mac
@@ -28,8 +29,9 @@ agent channel.
 | [**OnDevice Local API Server**](https://ondevice.fun/iphone-local-api/) | Sideload build | Dedicated local API surface for agents and LAN clients |
 | **OnDevice CoreAI Local API Server** | Beta | CoreAI-backed local API server variant |
 
-Repository slug remains `ios-local-llm` for stable links. Product name is
-**OnDevice LLM** in this source tree. See the [app website](https://ondevice.fun/local-ai-studio/) for the current app.
+Repository slug remains `ios-local-llm` for stable links, and the Xcode target
+is still `OnDeviceLAS`. The product name is **Local LLM Sketch**. See the
+[app website](https://ondevice.fun/local-ai-studio/) for the current app.
 
 The generated `OnDeviceLAS` target is the current server-only distribution of
 this source tree. It keeps local model loading, safety policy, and the
@@ -63,7 +65,54 @@ performance evidence; see [validation policy](Docs/VALIDATION.md).
 - Local voice activity detection, transcription, and speech synthesis
 - Local OpenAI-compatible API server and Mac bridge
 - Model discovery and downloads from Hugging Face
+- Browsing agent: searches, follows links, and cites what it read
+- Keep-awake modes, including a background mode for long generations
+- Accent and page-canvas color options on a purple default
 - iPhone and Apple-silicon Mac Catalyst targets
+
+## Browsing the web
+
+The Web screen (globe in the home header) runs a small agent on top of the
+existing Web Tool. Given a question it searches, opens the top results, follows
+the same-site links that look relevant, sanitizes everything it reads for prompt
+injection, and returns one cited block. Given a link it reads that page.
+
+- **Automatic** control plans and stops on a deterministic policy, so it works
+  with any local model or with none loaded.
+- **Model-driven** control lets the local model choose the next URL through a
+  small JSON action protocol.
+
+The same pipeline is exposed to the assistant as the `web_browse` tool. Web
+Access must be allowed for a run to start, and the agent obeys the existing SSRF
+validator, robots policy, per-host rate limiter, size caps, and token budget. It
+does not log in, fill forms, or run page JavaScript.
+
+## Keeping a session awake
+
+The Session screen (bolt icon) controls how long the app may run:
+
+| Mode | What it holds | Use it when |
+| --- | --- | --- |
+| Off | Nothing | Normal use |
+| Keep screen on | The idle timer | Long generations you are watching |
+| Screen + background | The idle timer and a coarse location session | The local API node or a generation must survive the screen locking |
+
+Background keep-awake requests `whenInUse` location at three-kilometer accuracy
+and discards every update: no coordinate is stored, logged, or sent. It is the
+only mechanism iOS offers for keeping a foreground app resident with the screen
+off. Turning it off restores the default behavior, where the listener stops when
+the app backgrounds.
+
+## Colors and the mark
+
+Theme settings offers four appearances (System, Light, Dark, OLED), fifteen
+accents (Plum, Orchid, and Lilac among them, with Plum as the default), and four
+page canvases (Neutral, Lavender, Plum, Midnight). The canvas tints only the page
+fill, so ink contrast and the semantic red/amber/green never move; the OLED
+appearance keeps its true-black page and locks the canvas.
+
+The mark is drawn in code (`IOSLocalLLM/LASLogoMark.swift`): a purple tile, one
+stroked sketch gesture, one dot.
 
 ## AI and agent integration
 

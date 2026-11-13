@@ -68,6 +68,11 @@ extension AppSettings {
         get { KoduTheme.KoduAccent(rawValue: themeAccent) ?? KoduTheme.appAccent }
         set { themeAccent = newValue.rawValue }
     }
+
+    var lasCanvas: KoduTheme.KoduCanvas {
+        get { KoduTheme.KoduCanvas(rawValue: canvasTint) ?? .neutral }
+        set { canvasTint = newValue.rawValue }
+    }
 }
 
 // MARK: - Theme host
@@ -95,7 +100,8 @@ struct LASThemeHost<Content: View>: View {
             appearance: appearance.koduAppearance(
                 systemPrefersDark: deviceColorScheme == .dark
             ),
-            accent: settings.lasAccent
+            accent: settings.lasAccent,
+            canvas: settings.lasCanvas
         )
 
         content
@@ -172,10 +178,36 @@ struct LASThemeSettingsView: View {
                     }
                     .lasCard()
 
+                    VStack(alignment: .leading, spacing: LASDesignTokens.row) {
+                        LASSectionLabel(
+                            title: "PAGE",
+                            trailing: canvasLocked
+                                ? "LOCKED · OLED"
+                                : settings.lasCanvas.displayName.uppercased()
+                        )
+
+                        LASCanvasRow(
+                            selected: settings.lasCanvas,
+                            isDark: T.isDark,
+                            isLocked: canvasLocked
+                        ) { canvas in
+                            select(canvas)
+                        }
+
+                        Text(canvasLocked
+                             ? "The OLED appearance keeps its true-black page, so the canvas tint waits until you choose Light or Dark."
+                             : "The canvas tints the page behind the glass. Ink, borders, and the semantic red/amber/green stay fixed, so contrast never changes.")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                    .lasCard()
+
                     Button {
                         withAnimation(.easeInOut(duration: 0.22)) {
                             settings.lasAppearance = .system
                             settings.lasAccent = KoduTheme.appAccent
+                            settings.lasCanvas = .neutral
                         }
                     } label: {
                         Label("Reset to defaults", systemImage: "arrow.counterclockwise")
@@ -257,6 +289,16 @@ struct LASThemeSettingsView: View {
             settings.lasAccent = accent
         }
     }
+
+    private func select(_ canvas: KoduTheme.KoduCanvas) {
+        guard settings.lasCanvas != canvas else { return }
+        withAnimation(.easeInOut(duration: 0.22)) {
+            settings.lasCanvas = canvas
+        }
+    }
+
+    /// The OLED appearance owns a true-black page; a tint would defeat it.
+    private var canvasLocked: Bool { settings.lasAppearance == .oled }
 }
 
 private struct LASAppearanceTile: View {
@@ -346,6 +388,56 @@ private struct LASAccentSwatchRow: View {
                 .buttonStyle(.plain)
                 .accessibilityLabel("\(accent.displayName) accent")
                 .accessibilityAddTraits(accent == selected ? [.isButton, .isSelected] : .isButton)
+            }
+        }
+    }
+}
+
+// MARK: - Canvas picker
+
+/// Page-canvas swatches. Each tile paints the real page color it selects, so the
+/// choice is legible without applying it first.
+private struct LASCanvasRow: View {
+    let selected: KoduTheme.KoduCanvas
+    let isDark: Bool
+    let isLocked: Bool
+    let onSelect: (KoduTheme.KoduCanvas) -> Void
+
+    private let columns = [GridItem(.adaptive(minimum: 76), spacing: LASDesignTokens.row)]
+
+    var body: some View {
+        LazyVGrid(columns: columns, spacing: LASDesignTokens.row) {
+            ForEach(KoduTheme.KoduCanvas.allCases) { canvas in
+                Button {
+                    onSelect(canvas)
+                } label: {
+                    VStack(spacing: LASDesignTokens.tight) {
+                        RoundedRectangle(cornerRadius: 12, style: .continuous)
+                            .fill(canvas.page(dark: isDark))
+                            .frame(height: 52)
+                            .overlay {
+                                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                                    .stroke(LASDesignTokens.hairline, lineWidth: 1)
+                            }
+                            .overlay {
+                                if canvas == selected {
+                                    Image(systemName: "checkmark")
+                                        .font(.system(size: 13, weight: .bold))
+                                        .foregroundStyle(isDark ? Color.white : Color.black.opacity(0.75))
+                                }
+                            }
+
+                        Text(canvas.displayName)
+                            .font(.caption2.weight(.semibold))
+                            .foregroundStyle(canvas == selected ? Color.primary : .secondary)
+                            .lineLimit(1)
+                    }
+                }
+                .buttonStyle(.plain)
+                .disabled(isLocked)
+                .opacity(isLocked ? 0.45 : 1)
+                .accessibilityLabel("\(canvas.displayName) page canvas")
+                .accessibilityAddTraits(canvas == selected ? [.isButton, .isSelected] : .isButton)
             }
         }
     }

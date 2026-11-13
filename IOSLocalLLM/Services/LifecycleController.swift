@@ -120,7 +120,12 @@ final class LifecycleController: Sendable {
         // termination as a jetsam/watchdog crash on the next launch.
         CrashReporter.shared.markCleanShutdown()
 
-        await LocalAPIManager.shared.stop()
+        // With the keep-awake background mode armed, the listener stays up on
+        // purpose; stopping it here would defeat the feature. In every other
+        // configuration the listener stops exactly as before.
+        if !KeepAwakeService.shared.wantsBackgroundKeepAlive {
+            await LocalAPIManager.shared.stop()
+        }
 
         // Cancel any previous background transition.
         backgroundTransitionTask?.cancel()
@@ -220,6 +225,7 @@ final class LifecycleController: Sendable {
     private func onActive(epoch: UInt64) async {
         guard epoch == lifecycleEpoch else { return }
         Diagnostics.shared.breadcrumb("scene active · epoch=\(epoch)", category: "lifecycle")
+        KeepAwakeService.shared.reconcile()
         if AppSettings.shared.localAPIEnabled {
             await LocalAPIManager.shared.start()
         }

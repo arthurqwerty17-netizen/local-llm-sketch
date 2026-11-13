@@ -38,7 +38,8 @@ final class LASAppDelegate: NSObject, UIApplicationDelegate {
         didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]? = nil
     ) -> Bool {
         CrashReporter.shared.install()
-        Diagnostics.shared.breadcrumb("On Device: LAS launch", category: "lifecycle")
+        KeepAwakeGenerationLease.shared.activate()
+        Diagnostics.shared.breadcrumb("Local LLM Sketch launch", category: "lifecycle")
         return true
     }
 
@@ -90,6 +91,7 @@ final class LASLifecycleController {
         switch phase {
         case .active:
             CrashReporter.shared.markRunning()
+            KeepAwakeService.shared.reconcile()
             guard AppSettings.shared.hasSeenOnboarding else { return }
             if AppSettings.shared.localAPIEnabled {
                 await LocalAPIManager.shared.start()
@@ -106,6 +108,16 @@ final class LASLifecycleController {
             // marker armed past that await misclassifies an ordinary
             // background termination as a jetsam/watchdog crash next launch.
             CrashReporter.shared.markCleanShutdown()
+            // Keep-awake with the background mode on deliberately leaves the
+            // listener running: that is the whole point of charging the screen
+            // and a location session. Every other configuration stops it here,
+            // exactly as before.
+            if KeepAwakeService.shared.wantsBackgroundKeepAlive {
+                CrashReporter.shared.markRunning()
+                CodingAssistantService.shared.stopGeneration()
+                await MLXGenerationGate.shared.clearCacheWhenIdle()
+                return
+            }
             await LocalAPIManager.shared.stop()
             guard epoch == self.epoch else { return }
             CodingAssistantService.shared.cancelLoad()

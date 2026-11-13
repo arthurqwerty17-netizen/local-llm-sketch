@@ -50,6 +50,14 @@ enum ToolRunner {
                                           them in your answer.
                                           If query is an http(s) URL, fetches
                                           that page directly.
+      • web_browse(query: string)       — the browsing agent. Searches, reads a
+                                          page, follows the most relevant links
+                                          on it, and returns everything it read
+                                          as one cited block. Use this instead
+                                          of web_search when the answer likely
+                                          lives one or two pages deeper (docs,
+                                          changelogs, reference pages). Slower
+                                          than web_search.
       • file_read(prompt?: string)      — asks the user to pick one or more
                                           local text/code/PDF files, then
                                           returns capped file contents.
@@ -122,8 +130,9 @@ enum ToolRunner {
     }
 
     private static let knownToolNames: Set<String> = [
-        "calculator", "datetime", "unit_convert", "web_search", "file_read",
-        "describe_image", "knowledge_base", "index_document", "generate_image"
+        "calculator", "datetime", "unit_convert", "web_search", "web_browse",
+        "file_read", "describe_image", "knowledge_base", "index_document",
+        "generate_image"
     ]
 
     private static func parseCallJSON(_ string: String) -> ToolCall? {
@@ -205,6 +214,7 @@ enum ToolRunner {
         case "datetime":       return runDatetime(args: call.args)
         case "unit_convert":   return runUnitConvert(args: call.args)
         case "web_search":     return await runWebSearch(args: call.args)
+        case "web_browse":     return await runWebBrowse(args: call.args)
         case "file_read":      return await runFileRead(args: call.args)
         case "describe_image": return await runDescribeImage()
         case "knowledge_base": return await runKnowledgeBase(args: call.args)
@@ -677,6 +687,63 @@ enum ToolRunner {
         case .failure(let err):
             return "Web search failed: \(err.localizedDescription)"
         }
+    }
+
+    // MARK: - Browsing agent (multi-page)
+
+    /// Runs the browsing agent to completion and returns its cited evidence
+    /// block. Same access rules as `web_search`: `.off` is a hard stop, and
+    /// `.askEveryTime` cannot raise a permission sheet mid-reply.
+    @MainActor
+    private static func runWebBrowse(args: [String: Any]) async -> String {
+        guard let q = (args["query"] as? String)?.trimmingCharacters(in: .whitespacesAndNewlines),
+              !q.isEmpty else {
+            return "Error: missing 'query'."
+        }
+        let service = WebToolService.shared
+        switch service.settings.mode {
+        case .off:
+            return "Error: Web access is turned off in Settings."
+        case .askEveryTime:
+            return "Error: Web access is set to ask every time; a browsing run can't request permission mid-reply. Set Web Access to Always Allow, or start the run from the Web screen."
+        case .alwaysAllow:
+            break
+        }
+
+        let agent = BrowsingAgentService.shared
+        guard !agent.isRunning else {
+            return "Error: a browsing run is already in progress."
+        }
+        let goal: BrowsingAgentService.Goal = {
+            if let url = URL(string: q),
+               let scheme = url.scheme?.lowercased(),
+               scheme == "http" || scheme == "https",
+               url.host != nil {
+                return .url(url)
+            }
+            return .question(q)
+        }()
+        agent.start(goal: goal, control: .automatic)
+
+        // A run is bounded by the agent's own step cap, but a stalled network
+        // must not hold the reply open forever.
+        let deadline = Date().addingTimeInterval(90)
+        while agent.isRunning, Date() < deadline {
+            try? await Task.sleep(for: .milliseconds(250))
+        }
+        if agent.isRunning {
+            agent.cancel()
+            let partial = agent.evidenceBlock
+            return partial.isEmpty
+                ? "The browsing run timed out before it read anything."
+                : "The browsing run timed out. Partial evidence:\n\n\(partial)"
+        }
+
+        if let failure = agent.lastFinished?.failure, agent.evidenceBlock.isEmpty {
+            return "Browsing failed: \(failure)"
+        }
+        let block = agent.evidenceBlock
+        return block.isEmpty ? "The browsing run read no usable pages." : block
     }
 
     // MARK: - File read (DocumentPicker)
