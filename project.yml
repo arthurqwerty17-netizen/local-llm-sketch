@@ -152,6 +152,15 @@ targets:
       # The browsing agent's screen. Lives under Views/ (excluded wholesale
       # above) but is part of this product's surface, like the two files above.
       - path: IOSLocalLLM/Views/LASWebBrowseView.swift
+      # Top tab shell, browser, files shelf, shell, GitHub, capability brief.
+      - path: IOSLocalLLM/Views/LASTopTabBar.swift
+      - path: IOSLocalLLM/Views/Browser
+      - path: IOSLocalLLM/Views/Files
+      - path: IOSLocalLLM/Services/Browser
+      - path: IOSLocalLLM/Services/WorkspaceFileStore.swift
+      - path: IOSLocalLLM/Services/WorkspaceShell.swift
+      - path: IOSLocalLLM/Services/GitService.swift
+      - path: IOSLocalLLM/Services/AgentCapabilityBrief.swift
     resources:
       - path: IOSLocalLLM/PrivacyInfo.xcprivacy
     info:

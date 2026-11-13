@@ -163,7 +163,7 @@ struct KoduTheme {
         // `plum` is the Local LLM Sketch signature purple and the default; the
         // other violet-family entries stay available so a user can keep a
         // softer or dirtier purple without leaving the brand family.
-        case onyx, system, rose, blue, violet, plum, orchid, lilac, emerald, amber, graphite, teal, indigo, coral, magenta
+        case onyx, system, rose, blue, violet, plum, orchid, lilac, silver, monochrome, electric, emerald, amber, graphite, teal, indigo, coral, magenta
         var id: String { rawValue }
         var displayName: String {
             switch self {
@@ -175,6 +175,9 @@ struct KoduTheme {
             case .plum: return "Plum"
             case .orchid: return "Orchid"
             case .lilac: return "Lilac"
+            case .silver: return "Silver"
+            case .monochrome: return "Monochrome"
+            case .electric: return "Electric"
             case .emerald: return "Emerald"
             case .amber: return "Amber"
             case .graphite: return "Graphite"
@@ -278,6 +281,24 @@ struct KoduTheme {
                 return dark
                     ? (c(0.776,0.702,1.000), c(0.827,0.769,1.000), c(0.694,0.612,0.980), c(0.745,0.671,0.992))
                     : (c(0.427,0.325,0.784), c(0.486,0.384,0.831), c(0.341,0.243,0.667), c(0.384,0.282,0.718))
+            case .silver:
+                // Cool metallic neutral. Light uses a mid-slate so white button
+                // text still clears AA; dark lifts to a bright chrome.
+                return dark
+                    ? (c(0.788,0.812,0.847), c(0.855,0.875,0.906), c(0.702,0.729,0.769), c(0.741,0.765,0.800))
+                    : (c(0.404,0.435,0.478), c(0.451,0.482,0.525), c(0.318,0.345,0.384), c(0.361,0.388,0.427))
+            case .monochrome:
+                // Pure greyscale — no hue at all, for a restrained, print-like
+                // surface. Distinct from `onyx` (which keeps a violet cast) and
+                // `graphite` (which is warmer).
+                return dark
+                    ? (c(0.780,0.780,0.780), c(0.850,0.850,0.850), c(0.700,0.700,0.700), c(0.735,0.735,0.735))
+                    : (c(0.290,0.290,0.290), c(0.340,0.340,0.340), c(0.200,0.200,0.200), c(0.245,0.245,0.245))
+            case .electric:
+                // High-voltage violet-blue, the loudest option in the family.
+                return dark
+                    ? (c(0.549,0.451,1.000), c(0.647,0.561,1.000), c(0.451,0.353,0.980), c(0.510,0.412,0.992))
+                    : (c(0.361,0.235,0.949), c(0.451,0.310,0.980), c(0.278,0.161,0.808), c(0.318,0.196,0.878))
             }
         }
     }

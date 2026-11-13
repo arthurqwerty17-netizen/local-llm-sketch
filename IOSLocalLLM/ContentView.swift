@@ -24,6 +24,7 @@ struct LocalAPIServerView: View {
     @State private var showingModelPicker = false
     @State private var showingDownloads = false
     @State private var lastLoggedModelState: CodingAssistantService.ServiceState?
+    @State private var topTab: LASTopTab = .chat
 
     var body: some View {
         NavigationStack {
@@ -32,77 +33,16 @@ struct LocalAPIServerView: View {
 
                 VStack(spacing: 0) {
                     LASHomeHeader()
+                    LASTopTabBar(selection: $topTab)
 
-                    ScrollView {
-                        VStack(alignment: .leading, spacing: 12) {
-                        LASNetworkBanner(
-                            state: manager.state,
-                            modelState: modelService.state,
-                            address: manager.addresses.first,
-                            port: port
-                        )
-
-                        LASHealthDashboard(
-                            snapshot: systemStatus.snapshot,
-                            thermalState: safetyMonitor.effectiveThermalState,
-                            lowPowerMode: safetyMonitor.lowPowerMode
-                        )
-
-                        LASLocalServerParserCard(
-                            serverState: manager.state,
-                            modelState: modelService.state,
-                            modelName: modelService.activeDisplayName,
-                            tokenRate: modelService.tokenRate
-                        )
-
-#if CORE_AI_SERVER_APP
-                        CoreAIModelStatusCard()
-#endif
-
-                        LASHomeServerCard(
-                            state: manager.state,
-                            serverEnabled: $serverEnabled,
-                            keepScreenAwake: $keepScreenAwake,
-                            autoLoadModel: $autoLoadModel,
-                            toolCallingEnabled: $toolCallingEnabled,
-                            reasoningEnabled: $reasoningEnabled,
-                            parallelToolCallsLimit: $parallelToolCallsLimit,
-                            strictToolSchemasEnabled: $strictToolSchemasEnabled,
-                            portText: $portText,
-                            modelName: modelService.activeDisplayName,
-                            modelID: modelService.activeModel.id,
-                            repoID: modelService.activeModel.repoID,
-                            capabilityProfile: ModelCapabilityProfile.resolve(
-                                for: modelService.activeModel
-                            ),
-                            modelState: modelService.state,
-                            addresses: manager.addresses,
-                            port: port,
-                            apiKey: manager.apiKey,
-                            apiKeyVisible: $apiKeyVisible,
-                            copyMessage: copyMessage,
-                            onRestart: restartServer,
-                            onApplyPort: applyPort,
-                            onLoadModel: loadModel,
-                            onChooseModel: { showingModelPicker = true },
-                            onStopModel: modelService.unload,
-                            onCopyURL: copyURL,
-                            onCopyKey: copyKey,
-                            onRotateKey: { showingKeyRotationConfirmation = true },
-                            onCopySetup: copySetupCommands
-                        )
-
-                        LASDeveloperEndpointsCard(
-                            address: manager.addresses.first,
-                            port: port,
-                            onCopyURL: copyURL
-                        )
+                    switch topTab {
+                    case .browser:
+                        FocusBrowserView()
+                    case .files:
+                        LASFilesView()
+                    case .chat:
+                        chatSurface
                     }
-                        .padding(.horizontal, LASDesignTokens.pageInset)
-                        .padding(.top, 12)
-                        .padding(.bottom, 28)
-                    }
-                    .scrollIndicators(.hidden)
                 }
             }
             .toolbar(.hidden, for: .navigationBar)
@@ -178,6 +118,84 @@ struct LocalAPIServerView: View {
                 Text("Existing clients will stop working until they use the new key.")
             }
         }
+    }
+
+    // MARK: - Chat surface
+    //
+    // The server dashboard, unchanged, now one of three stops in the top tab bar
+    // instead of the whole screen.
+
+    private var chatSurface: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 12) {
+                LASNetworkBanner(
+                    state: manager.state,
+                    modelState: modelService.state,
+                    address: manager.addresses.first,
+                    port: port
+                )
+
+                LASHealthDashboard(
+                    snapshot: systemStatus.snapshot,
+                    thermalState: safetyMonitor.effectiveThermalState,
+                    lowPowerMode: safetyMonitor.lowPowerMode
+                )
+
+                LASLocalServerParserCard(
+                    serverState: manager.state,
+                    modelState: modelService.state,
+                    modelName: modelService.activeDisplayName,
+                    tokenRate: modelService.tokenRate
+                )
+
+#if CORE_AI_SERVER_APP
+                CoreAIModelStatusCard()
+#endif
+
+                LASHomeServerCard(
+                    state: manager.state,
+                    serverEnabled: $serverEnabled,
+                    keepScreenAwake: $keepScreenAwake,
+                    autoLoadModel: $autoLoadModel,
+                    toolCallingEnabled: $toolCallingEnabled,
+                    reasoningEnabled: $reasoningEnabled,
+                    parallelToolCallsLimit: $parallelToolCallsLimit,
+                    strictToolSchemasEnabled: $strictToolSchemasEnabled,
+                    portText: $portText,
+                    modelName: modelService.activeDisplayName,
+                    modelID: modelService.activeModel.id,
+                    repoID: modelService.activeModel.repoID,
+                    capabilityProfile: ModelCapabilityProfile.resolve(
+                        for: modelService.activeModel
+                    ),
+                    modelState: modelService.state,
+                    addresses: manager.addresses,
+                    port: port,
+                    apiKey: manager.apiKey,
+                    apiKeyVisible: $apiKeyVisible,
+                    copyMessage: copyMessage,
+                    onRestart: restartServer,
+                    onApplyPort: applyPort,
+                    onLoadModel: loadModel,
+                    onChooseModel: { showingModelPicker = true },
+                    onStopModel: modelService.unload,
+                    onCopyURL: copyURL,
+                    onCopyKey: copyKey,
+                    onRotateKey: { showingKeyRotationConfirmation = true },
+                    onCopySetup: copySetupCommands
+                )
+
+                LASDeveloperEndpointsCard(
+                    address: manager.addresses.first,
+                    port: port,
+                    onCopyURL: copyURL
+                )
+            }
+            .padding(.horizontal, LASDesignTokens.pageInset)
+            .padding(.top, 12)
+            .padding(.bottom, 28)
+        }
+        .scrollIndicators(.hidden)
     }
 
     private func restartServer() {

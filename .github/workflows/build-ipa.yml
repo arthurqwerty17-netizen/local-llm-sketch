@@ -1,0 +1,112 @@
+name: Build IPA
+
+on:
+  push:
+    branches: [main, preview]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+# Archives the app, packages an unsigned IPA, uploads it as a build artifact,
+# and attaches it to a GitHub Release tagged after the app's marketing version.
+#
+# The native inference frameworks (llama.xcframework, whisper) are NOT built
+# here: they are produced by scripts/build_native_frameworks.sh from submodules
+# and are gitignored. This job therefore runs only when the tracked project
+# builds without them, and reports clearly when it cannot — see the guard step.
+
+jobs:
+  build:
+    runs-on: macos-15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: false
+
+      - name: Select Xcode
+        run: |
+          sudo xcode-select -s /Applications/Xcode.app
+          xcodebuild -version
+
+      - name: Check for the generated project
+        id: guard
+        run: |
+          if [ ! -d "OnDeviceLAS.xcodeproj" ]; then
+            echo "present=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::OnDeviceLAS.xcodeproj is missing; run xcodegen before building."
+          else
+            echo "present=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Guard on native frameworks
+        id: native
+        if: steps.guard.outputs.present == 'true'
+        run: |
+          if [ -d "ThirdParty/llama.cpp/build-apple/llama.xcframework" ]; then
+            echo "ready=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+            echo "::warning::llama.xcframework is absent. Build it with ./scripts/build_native_frameworks.sh on an Apple-silicon Mac, then re-dispatch."
+          fi
+
+      - name: Archive
+        if: steps.guard.outputs.present == 'true' && steps.native.outputs.ready == 'true'
+        run: |
+          xcodebuild \
+            -project OnDeviceLAS.xcodeproj \
+            -scheme OnDeviceLAS \
+            -configuration Release \
+            -destination 'generic/platform=iOS' \
+            -archivePath build/LocalLLMSketch.xcarchive \
+            archive \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGN_IDENTITY="" \
+            CODE_SIGNING_REQUIRED=NO
+
+      - name: Package unsigned IPA
+        if: steps.guard.outputs.present == 'true' && steps.native.outputs.ready == 'true'
+        run: |
+          mkdir -p Payload
+          cp -R "build/LocalLLMSketch.xcarchive/Products/Applications/"*.app Payload/
+          zip -qry LocalLLMSketch.ipa Payload
+
+      - name: Read app version
+        id: version
+        if: steps.guard.outputs.present == 'true' && steps.native.outputs.ready == 'true'
+        run: |
+          VERSION=$(/usr/libexec/PlistBuddy -c \
+            "Print :CFBundleShortVersionString" \
+            build/LocalLLMSketch.xcarchive/Products/Applications/*.app/Info.plist)
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+
+      - name: Determine release channel
+        id: channel
+        if: steps.guard.outputs.present == 'true' && steps.native.outputs.ready == 'true'
+        run: |
+          if [ "$GITHUB_REF_NAME" = "main" ]; then
+            echo "suffix=" >> "$GITHUB_OUTPUT"
+            echo "body=Unsigned IPA built from main. Re-sign it with your own certificate to install." >> "$GITHUB_OUTPUT"
+          else
+            echo "suffix=-preview" >> "$GITHUB_OUTPUT"
+            echo "body=Unsigned IPA built from the preview branch. Re-sign it with your own certificate to install." >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Upload IPA artifact
+        if: steps.guard.outputs.present == 'true' && steps.native.outputs.ready == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: LocalLLMSketch-ipa${{ steps.channel.outputs.suffix }}
+          path: LocalLLMSketch.ipa
+          if-no-files-found: error
+
+      - name: Attach IPA to GitHub release
+        if: steps.guard.outputs.present == 'true' && steps.native.outputs.ready == 'true'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ format('v{0}', steps.version.outputs.version) }}
+          name: ${{ format('Local LLM Sketch v{0}', steps.version.outputs.version) }}
+          body: ${{ steps.channel.outputs.body }}
+          files: LocalLLMSketch.ipa
+          fail_on_unmatched_files: true

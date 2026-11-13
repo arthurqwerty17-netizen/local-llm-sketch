@@ -2674,6 +2674,7 @@ struct CodingAssistantView: View {
                 if !memory.isEmpty { prompt += "\n\n" + memory }
                 if AppSettings.shared.toolsEnabled {
                     prompt += ToolRunner.systemPromptAddendum
+                    prompt += "\n\n" + ToolRunner.environmentBrief()
                 }
                 prompt += WebToolPromptBuilder.systemAddition()
                 messages.append(ChatMessage(role: .system, content: prompt))
@@ -3088,6 +3089,7 @@ struct CodingAssistantView: View {
             if !memory.isEmpty { prompt += "\n\n" + memory }
             if AppSettings.shared.toolsEnabled {
                 prompt += ToolRunner.systemPromptAddendum
+                prompt += "\n\n" + ToolRunner.environmentBrief()
             }
             if !attachments.isEmpty {
                 prompt += FileAttachmentService.systemPromptAddendum

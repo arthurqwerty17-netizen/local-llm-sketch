@@ -92,6 +92,15 @@ enum ToolRunner {
     block if you still need more information, or give your final answer.
     """
 
+    /// The environment this turn is actually running in: which tools are wired
+    /// right now and how to call them. Kept separate from `systemPromptAddendum`
+    /// so the static format rules stay stable while the capability list tracks
+    /// live state (a linked repository, an open page, a non-empty shelf).
+    @MainActor
+    static func environmentBrief() -> String {
+        AgentCapabilityBrief.text() + "\n\nADDITIONAL TOOLS:\n" + AgentCapabilityBrief.toolSchemas
+    }
+
     // MARK: - Detection
 
     /// Returns the first tool call found in a streamed assistant reply.
@@ -132,7 +141,11 @@ enum ToolRunner {
     private static let knownToolNames: Set<String> = [
         "calculator", "datetime", "unit_convert", "web_search", "web_browse",
         "file_read", "describe_image", "knowledge_base", "index_document",
-        "generate_image"
+        "generate_image",
+        // browser / files / shell / github
+        "browser_read", "browser_navigate", "browser_desktop_mode", "browser_download",
+        "files_list", "files_read", "files_write", "shell",
+        "github_repo_files", "github_read", "github_commit", "github_build", "github_runs"
     ]
 
     private static func parseCallJSON(_ string: String) -> ToolCall? {
@@ -220,6 +233,19 @@ enum ToolRunner {
         case "knowledge_base": return await runKnowledgeBase(args: call.args)
         case "index_document": return await runIndexDocument(args: call.args)
         case "generate_image": return await runGenerateImage(args: call.args)
+        case "browser_read":   return await runBrowserRead()
+        case "browser_navigate": return await runBrowserNavigate(args: call.args)
+        case "browser_desktop_mode": return await runBrowserDesktopMode(args: call.args)
+        case "browser_download": return await runBrowserDownload(args: call.args)
+        case "files_list":     return await runFilesList()
+        case "files_read":     return await runFilesRead(args: call.args)
+        case "files_write":    return await runFilesWrite(args: call.args)
+        case "shell":          return await runShell(args: call.args)
+        case "github_repo_files": return await runGitHubRepoFiles()
+        case "github_read":    return await runGitHubRead(args: call.args)
+        case "github_commit":  return await runGitHubCommit(args: call.args)
+        case "github_build":   return await runGitHubBuild()
+        case "github_runs":    return await runGitHubRuns()
         default:               return "Error: unknown tool '\(call.name)'"
         }
     }
@@ -744,6 +770,247 @@ enum ToolRunner {
         }
         let block = agent.evidenceBlock
         return block.isEmpty ? "The browsing run read no usable pages." : block
+    }
+
+    // MARK: - Browser tools
+    //
+    // These drive the in-app browser the user is watching, so every one of them
+    // changes something visible on screen. They exist because the user asked for
+    // "see what they're viewing and control the screen they're on": reading a
+    // page and navigating that same tab is the whole contract.
+
+    @MainActor
+    private static func runBrowserRead() async -> String {
+        let browser = FocusBrowser.shared
+        guard browser.currentURL != nil else {
+            return "No page is open in the browser. Use browser_navigate(url) first."
+        }
+        let block = await browser.pageContextBlock()
+        return block.isEmpty ? "The page produced no readable text." : block
+    }
+
+    @MainActor
+    private static func runBrowserNavigate(args: [String: Any]) async -> String {
+        guard let raw = (args["url"] as? String)?.trimmingCharacters(in: .whitespacesAndNewlines),
+              !raw.isEmpty else {
+            return "Error: missing 'url'."
+        }
+        guard let url = FocusBrowser.resolve(raw) else {
+            return "Error: '\(raw)' is not a usable URL."
+        }
+        FocusBrowser.shared.load(url)
+        return "Opened \(url.absoluteString) in the in-app browser."
+    }
+
+    @MainActor
+    private static func runBrowserDesktopMode(args: [String: Any]) async -> String {
+        let enabled: Bool = {
+            if let value = args["enabled"] as? Bool { return value }
+            if let text = args["enabled"] as? String { return text.lowercased() == "true" }
+            return true
+        }()
+        FocusBrowser.shared.setDesktopMode(enabled)
+        return "Desktop mode \(enabled ? "on" : "off"). The page reloads to apply it."
+    }
+
+    /// Downloads through the same validated fetch path the Web Tool uses, then
+    /// drops the bytes on the shelf. WKDownload would also work but it hands the
+    /// file to a delegate, not back to the model, and this way the tool can
+    /// answer with the file name it created.
+    @MainActor
+    private static func runBrowserDownload(args: [String: Any]) async -> String {
+        guard let raw = (args["url"] as? String)?.trimmingCharacters(in: .whitespacesAndNewlines),
+              !raw.isEmpty, let url = URL(string: raw) else {
+            return "Error: missing or invalid 'url'."
+        }
+        let validator = URLSafetyValidator()
+        let verdict = await validator.validateStable(url)
+        guard verdict.isSafe else {
+            return "Blocked: \(verdict.reason)"
+        }
+        do {
+            var request = URLRequest(url: url)
+            request.timeoutInterval = 60
+            let (data, response) = try await URLSession.shared.data(for: request)
+            if let http = response as? HTTPURLResponse, !(200...299).contains(http.statusCode) {
+                return "Download failed: HTTP \(http.statusCode)."
+            }
+            guard data.count <= 50 * 1024 * 1024 else {
+                return "Download refused: the file is larger than 50 MB."
+            }
+            let suggested = (args["name"] as? String)
+                ?? response.suggestedFilename
+                ?? url.lastPathComponent
+            let entry = try WorkspaceFileStore.shared.save(
+                data: data,
+                name: suggested.isEmpty ? "download" : suggested
+            )
+            return "Saved \(entry.name) (\(entry.byteCountLabel)) to the Files shelf."
+        } catch {
+            return "Download failed: \(error.localizedDescription)"
+        }
+    }
+
+    // MARK: - Files tools
+
+    @MainActor
+    private static func runFilesList() async -> String {
+        WorkspaceFileStore.shared.refresh()
+        return WorkspaceFileStore.shared.catalogueBlock()
+    }
+
+    @MainActor
+    private static func runFilesRead(args: [String: Any]) async -> String {
+        guard let name = (args["name"] as? String)?.trimmingCharacters(in: .whitespacesAndNewlines),
+              !name.isEmpty else {
+            return "Error: missing 'name'."
+        }
+        WorkspaceFileStore.shared.refresh()
+        guard let entry = WorkspaceFileStore.shared.entries.first(where: { $0.name == name })
+                ?? WorkspaceFileStore.shared.entries.first(where: { $0.name.hasSuffix(name) }) else {
+            return "No file named '\(name)' on the shelf. Call files_list first."
+        }
+        guard let text = WorkspaceFileStore.shared.text(for: entry) else {
+            return "'\(entry.name)' is not a text file (\(entry.byteCountLabel))."
+        }
+        return text
+    }
+
+    @MainActor
+    private static func runFilesWrite(args: [String: Any]) async -> String {
+        guard let name = (args["name"] as? String)?.trimmingCharacters(in: .whitespacesAndNewlines),
+              !name.isEmpty else {
+            return "Error: missing 'name'."
+        }
+        guard let text = args["text"] as? String else {
+            return "Error: missing 'text'."
+        }
+        do {
+            try WorkspaceFileStore.shared.save(data: Data(text.utf8), name: name)
+            return "Wrote \(text.utf8.count) bytes to '\(WorkspaceFileStore.sanitized(name))' on the shelf."
+        } catch {
+            return "Could not write the file: \(error.localizedDescription)"
+        }
+    }
+
+    // MARK: - Shell
+
+    @MainActor
+    private static func runShell(args: [String: Any]) async -> String {
+        guard let command = (args["command"] as? String)?
+            .trimmingCharacters(in: .whitespacesAndNewlines),
+              !command.isEmpty else {
+            return "Error: missing 'command'."
+        }
+        let output = await WorkspaceShell.shared.run(command)
+        var text = output.combined
+        if text.count > 12_000 {
+            text = String(text.prefix(12_000)) + "\n… truncated"
+        }
+        return text
+    }
+
+    // MARK: - GitHub
+
+    private static func linkedRepositoryOrError() -> Result<GitService.Repository, String> {
+        guard GitService.shared.hasToken else {
+            return .failure("No GitHub token saved. Ask the user to add one in GitHub settings.")
+        }
+        guard let repository = GitService.shared.linkedRepository else {
+            return .failure("No repository is linked. Ask the user to pick one in GitHub settings.")
+        }
+        return .success(repository)
+    }
+
+    @MainActor
+    private static func runGitHubRepoFiles() async -> String {
+        switch linkedRepositoryOrError() {
+        case .failure(let message): return message
+        case .success(let repository):
+            let tree = await GitService.shared.listTree(repository: repository)
+            guard !tree.isEmpty else {
+                return "Could not read the tree of \(repository.fullName)."
+            }
+            let listed = tree.prefix(300).map { "\($0.path)\t\(Int64($0.size).formattedBytes)" }
+            return "\(repository.fullName) (\(tree.count) files)\n" + listed.joined(separator: "\n")
+        }
+    }
+
+    @MainActor
+    private static func runGitHubRead(args: [String: Any]) async -> String {
+        guard let path = (args["path"] as? String)?.trimmingCharacters(in: .whitespacesAndNewlines),
+              !path.isEmpty else {
+            return "Error: missing 'path'."
+        }
+        switch linkedRepositoryOrError() {
+        case .failure(let message): return message
+        case .success(let repository):
+            guard let text = await GitService.shared.readFile(repository: repository, path: path) else {
+                return "Could not read '\(path)' from \(repository.fullName)."
+            }
+            return text.count > 20_000 ? String(text.prefix(20_000)) + "\n… truncated" : text
+        }
+    }
+
+    /// Committing is a real write to the user's repository. It only runs when
+    /// the user has linked a repository and asked for a change; the tool itself
+    /// does not gate further, because the model reaching this point already
+    /// decided to write.
+    @MainActor
+    private static func runGitHubCommit(args: [String: Any]) async -> String {
+        guard let path = (args["path"] as? String)?.trimmingCharacters(in: .whitespacesAndNewlines),
+              !path.isEmpty else {
+            return "Error: missing 'path'."
+        }
+        guard let text = args["text"] as? String else {
+            return "Error: missing 'text'."
+        }
+        let message = (args["message"] as? String) ?? "Update \(path)"
+        switch linkedRepositoryOrError() {
+        case .failure(let failure): return failure
+        case .success(let repository):
+            let result = await GitService.shared.commitFile(
+                repository: repository,
+                path: path,
+                contents: text,
+                message: message
+            )
+            switch result {
+            case .success(let url):
+                return "Committed \(path) to \(repository.fullName). \(url.absoluteString)"
+            case .failure(let failure):
+                return "Commit failed: \(failure)"
+            }
+        }
+    }
+
+    @MainActor
+    private static func runGitHubBuild() async -> String {
+        switch linkedRepositoryOrError() {
+        case .failure(let message): return message
+        case .success(let repository):
+            let result = await GitService.shared.dispatchWorkflow(repository: repository)
+            switch result {
+            case .success(let message): return message
+            case .failure(let failure): return "Build dispatch failed: \(failure)"
+            }
+        }
+    }
+
+    @MainActor
+    private static func runGitHubRuns() async -> String {
+        switch linkedRepositoryOrError() {
+        case .failure(let message): return message
+        case .success(let repository):
+            await GitService.shared.loadRuns(repository: repository)
+            let runs = GitService.shared.runs
+            guard !runs.isEmpty else {
+                return "No workflow runs found for \(repository.fullName)."
+            }
+            return runs.prefix(10).map { run in
+                "\(run.name) · \(run.status)\(run.conclusion.map { " · \($0)" } ?? "") · \(run.branch)"
+            }.joined(separator: "\n")
+        }
     }
 
     // MARK: - File read (DocumentPicker)
