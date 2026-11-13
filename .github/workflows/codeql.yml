@@ -1,12 +1,11 @@
 name: CodeQL
 
+# Manual only. Swift analysis needs a macOS runner, which is billable on a
+# private repository, so it must not fire on every push: it would queue behind —
+# and compete for quota with — the IPA build that produces the artifact. Run it
+# from the Actions tab when you want a security sweep.
 on:
-  push:
-    branches:
-      - main
-  pull_request:
-    branches:
-      - main
+  workflow_dispatch:
   schedule:
     - cron: "31 4 * * 1"
 
@@ -32,14 +31,15 @@ jobs:
         with:
           submodules: recursive
 
-      - name: Install XcodeGen
-        run: brew install xcodegen
+      - name: Install project tools
+        run: |
+          command -v xcodegen >/dev/null || brew install xcodegen
+          command -v pod >/dev/null || gem install cocoapods --no-document
 
       - name: Generate the Xcode project
-        run: xcodegen generate
-
-      - name: Install locked CocoaPods dependencies
-        run: pod install --deployment
+        run: |
+          xcodegen generate
+          pod install
 
       - name: Derive the native framework cache key
         id: native-cache-key
@@ -53,7 +53,7 @@ jobs:
                 scripts/native/build_whisper_ios.sh
             } | shasum -a 256 | awk '{ print $1 }'
           )"
-          echo "key=native-ios-${RUNNER_OS}-${RUNNER_ARCH}-${native_hash}" >>"$GITHUB_OUTPUT"
+          echo "key=native-ios-${RUNNER_ARCH}-${native_hash}" >>"$GITHUB_OUTPUT"
 
       - name: Restore pinned native frameworks
         id: native-cache
@@ -66,7 +66,7 @@ jobs:
 
       - name: Build pinned native inference frameworks
         if: steps.native-cache.outputs.cache-hit != 'true'
-        run: ./scripts/build_native_frameworks.sh
+        run: ./scripts/build_native_frameworks.sh --skip-whisper
 
       - name: Initialize CodeQL
         uses: github/codeql-action/init@8aad20d150bbac5944a9f9d289da16a4b0d87c1e # v4.36.2

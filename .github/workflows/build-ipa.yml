@@ -8,29 +8,42 @@ on:
 permissions:
   contents: write
 
-# Archives the app, packages an unsigned IPA, uploads it as a build artifact,
-# and attaches it to a GitHub Release. Everything the archive needs — the pinned
-# submodules, the native xcframeworks built from them, the generated Xcode
-# project, and the pods — is produced on the runner, so this is the whole build.
+# This is the ONLY workflow that runs a macOS runner automatically, because
+# macOS minutes are billable on a private repository at the highest rate.
+# Everything else runs on ubuntu (free), and CodeQL-for-Swift plus the
+# VoiceAgentOrb tests are `workflow_dispatch` only for the same reason.
+#
+# One job, ordered cheapest-first so a mistake costs seconds rather than half an
+# hour: parse every Swift file, then build the native framework (cached), then
+# generate + pod install, then archive.
+
+concurrency:
+  group: build-ipa-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
-  # Always runs. Parses every Swift source with the toolchain the runner already
-  # has, so a syntax error fails CI before the archive job is reached. This is a
-  # parse, not a type-check: it needs no SDK frameworks and no native xcframeworks.
-  syntax:
+  build:
     runs-on: macos-15
+    timeout-minutes: 300
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
-          submodules: false
+          submodules: recursive
+          fetch-depth: 1
 
+      # Pick the newest installed Xcode rather than trusting the image default.
       - name: Select Xcode
         run: |
-          sudo xcode-select -s /Applications/Xcode.app
+          set -euo pipefail
+          ls -d /Applications/Xcode*.app 2>/dev/null || true
+          latest=$(ls -d /Applications/Xcode*.app 2>/dev/null | sort -V | tail -1 || true)
+          sudo xcode-select -s "${latest:-/Applications/Xcode.app}"
           xcodebuild -version
           swift --version
 
+      # Cheap gate: a syntax error in any Swift file would otherwise only appear
+      # after the expensive native build.
       - name: Parse Swift sources
         run: |
           set -euo pipefail
@@ -43,47 +56,49 @@ jobs:
           done < <(find IOSLocalLLM CoreAIOnDeviceLAS -name '*.swift' -not -path '*/Vendor/*')
           exit $fail
 
-  # Builds the gitignored native inference frameworks from the pinned
-  # submodules, regenerates the Xcode project, archives, and releases an
-  # unsigned IPA. This is the only job that produces an installable artifact.
-  # It deliberately does not `needs: syntax`: a parse nit in one file must not
-  # stop the IPA from being built and testable.
-  build:
-    runs-on: macos-15
-    timeout-minutes: 300
-    steps:
-      - name: Checkout with submodules
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
-        with:
-          submodules: recursive
-          fetch-depth: 0
-
-      - name: Select Xcode
-        run: |
-          sudo xcode-select -s /Applications/Xcode.app
-          xcodebuild -version
-
       - name: Install project tools
         run: |
-          brew install xcodegen cocoapods cmake ninja || true
+          command -v xcodegen >/dev/null || brew install xcodegen
+          command -v cmake >/dev/null || brew install cmake
+          command -v pod >/dev/null || gem install cocoapods --no-document
           xcodegen --version
           pod --version
 
-      - name: Build native frameworks
+      # llama.cpp is a submodule gitlink. If this history has no gitlink for it,
+      # clone it so the archive still has the framework it links.
+      - name: Ensure llama.cpp sources
         run: |
           set -euo pipefail
-          # `git submodule update --init` above is a no-op if this tree carries
-          # no gitlink for llama.cpp. Fall back to a shallow clone so the archive
-          # still has the framework it links.
           if [ ! -f ThirdParty/llama.cpp/build-xcframework.sh ]; then
-            echo "::warning::ThirdParty/llama.cpp is not present after checkout; cloning it"
+            echo "::warning::ThirdParty/llama.cpp absent after checkout; cloning it"
             rm -rf ThirdParty/llama.cpp
             git clone --depth 1 https://github.com/ggml-org/llama.cpp ThirdParty/llama.cpp
           fi
-          if [ ! -f ThirdParty/whisper.cpp/build-xcframework.sh ]; then
-            echo "::notice::whisper.cpp is absent; --skip-whisper will cover it"
-          fi
-          ./scripts/build_native_frameworks.sh --skip-whisper
+
+      - name: Derive native framework cache key
+        id: native-key
+        run: |
+          set -euo pipefail
+          hash="$(
+            {
+              git -C ThirdParty/llama.cpp rev-parse HEAD
+              git hash-object \
+                Patches/llama.cpp-ios-only-xcframework.patch \
+                scripts/build_native_frameworks.sh
+            } | shasum -a 256 | awk '{ print $1 }'
+          )"
+          echo "key=native-ios-${{ runner.arch }}-${hash}" >>"$GITHUB_OUTPUT"
+
+      - name: Restore native framework
+        id: native-cache
+        uses: actions/cache@caa296126883cff596d87d8935842f9db880ef25 # v5.1.0
+        with:
+          path: ThirdParty/llama.cpp/build-apple/llama.xcframework
+          key: ${{ steps.native-key.outputs.key }}
+
+      - name: Build llama.cpp XCFramework
+        if: steps.native-cache.outputs.cache-hit != 'true'
+        run: ./scripts/build_native_frameworks.sh --skip-whisper
 
       - name: Generate the Xcode project
         run: |
@@ -109,22 +124,21 @@ jobs:
 
       - name: Package unsigned IPA
         run: |
+          set -euo pipefail
           mkdir -p Payload
-          cp -R "build/LocalLLMSketch.xcarchive/Products/Applications/"*.app Payload/
+          cp -R build/LocalLLMSketch.xcarchive/Products/Applications/*.app Payload/
           zip -qry LocalLLMSketch.ipa Payload
           ls -la LocalLLMSketch.ipa
 
       - name: Read app version
         id: version
         run: |
-          VERSION=$(/usr/libexec/PlistBuddy -c \
-            "Print :CFBundleShortVersionString" \
-            build/LocalLLMSketch.xcarchive/Products/Applications/*.app/Info.plist)
-          BUILD=$(/usr/libexec/PlistBuddy -c \
-            "Print :CFBundleVersion" \
-            build/LocalLLMSketch.xcarchive/Products/Applications/*.app/Info.plist)
-          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
-          echo "tag=v$VERSION-$BUILD" >> "$GITHUB_OUTPUT"
+          set -euo pipefail
+          app="$(echo build/LocalLLMSketch.xcarchive/Products/Applications/*.app)"
+          version=$(/usr/libexec/PlistBuddy -c "Print :CFBundleShortVersionString" "$app/Info.plist")
+          build=$(/usr/libexec/PlistBuddy -c "Print :CFBundleVersion" "$app/Info.plist")
+          echo "version=$version" >>"$GITHUB_OUTPUT"
+          echo "tag=v$version-$build" >>"$GITHUB_OUTPUT"
 
       - name: Upload IPA artifact
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
@@ -140,12 +154,12 @@ jobs:
           tag_name: ${{ steps.version.outputs.tag }}
           name: ${{ format('Local LLM Sketch {0}', steps.version.outputs.tag) }}
           body: |
-            Unsigned IPA built from `${{ github.ref_name }}` at ${{ github.sha }}.
+            Unsigned IPA built from `${{ github.ref_name }}` at `${{ github.sha }}`.
 
-            Sideload it with AltStore, SideStore, Sideloadly, or TrollStore.
-            The build carries the JIT and increased-memory entitlements, so a
-            sideload that preserves entitlements (TrollStore, or a signing
-            profile with `get-task-allow`) keeps JIT enabled.
+            Sideload it with AltStore, SideStore, Sideloadly, or TrollStore. The
+            bundle declares the JIT and increased-memory entitlements; whether a
+            signing path keeps them decides whether JIT is live, and Session
+            reports the answer at runtime.
           files: LocalLLMSketch.ipa
           fail_on_unmatched_files: true
           draft: false

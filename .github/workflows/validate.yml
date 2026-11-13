@@ -9,6 +9,16 @@ on:
 permissions:
   contents: read
 
+# Two free Ubuntu jobs. Nothing here needs a macOS runner:
+#
+#   repository — the open-source hygiene checks (required files, version sync,
+#                secret scan, pinned actions).
+#   parse      — every Swift file parsed by a Swift toolchain in a Linux
+#                container. It cannot type-check UIKit/SwiftUI/WebKit, but it
+#                catches syntax errors, which is the class of mistake that
+#                otherwise only shows up 30 minutes into a paid macOS build.
+#
+# The one macOS job that matters is build-ipa.yml.
 jobs:
   repository:
     runs-on: ubuntu-latest
@@ -17,9 +27,22 @@ jobs:
       - name: Validate repository contents
         run: ./scripts/validate_open_source.sh
 
-  voice-orb:
-    runs-on: macos-15
+  parse:
+    runs-on: ubuntu-latest
+    container: swift:6.0
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
-      - name: Test VoiceAgentOrb
-        run: swift test --package-path Packages/VoiceAgentOrb
+      - name: Parse Swift sources
+        run: |
+          set -euo pipefail
+          swift --version
+          fail=0
+          while IFS= read -r file; do
+            if ! swiftc -parse "$file" >/tmp/parse.log 2>&1; then
+              echo "::error file=$file::$(head -n 5 /tmp/parse.log | tr '\n' ' ')"
+              sed -n '1,10p' /tmp/parse.log || true
+              fail=1
+            fi
+          done < <(find IOSLocalLLM CoreAIOnDeviceLAS IOSLocalLLMShareExtension \
+                     -name '*.swift' -not -path '*/Vendor/*' | sort)
+          exit $fail

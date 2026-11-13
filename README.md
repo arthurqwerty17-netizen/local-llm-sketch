@@ -21,11 +21,14 @@ unsigned and carries the JIT and increased-memory entitlements. See
 [release verification](Docs/RELEASE_VERIFICATION.md) for what a release contains
 and how to check it.
 
-CI produces it: `Build IPA` checks out the submodules, builds
+The IPA is built by `Build IPA`, which checks out the submodules, builds
 `llama.xcframework`, runs `xcodegen generate` and `pod install`, archives,
-packages the IPA, and attaches it to a release tagged `v<version>-<build>`.
-Every push to `main` builds, so "did it compile?" is a question the Actions tab
-answers.
+packages, and attaches the IPA to a release tagged `v<version>-<build>`.
+
+**That workflow needs a macOS runner, which a private repository on a free plan
+does not get.** If Releases is empty, read [Docs/CI.md](Docs/CI.md): making the
+repository public gives free macOS minutes, and the next push to `main` builds
+and releases it automatically.
 
 ## What the assistant can do here
 
