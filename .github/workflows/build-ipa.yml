@@ -3,20 +3,25 @@ name: Build IPA
 on:
   push:
     branches: [main, preview]
+    # A macOS minute is the most expensive thing in this repository. Documentation
+    # and metadata changes do not need the app compiled.
+    paths-ignore:
+      - "**.md"
+      - "Docs/**"
+      - "llms.txt"
+      - "codemeta.json"
+      - "SBOM.spdx.json"
+      - "LICENSE"
+      - "LICENSES/**"
+      - ".github/ISSUE_TEMPLATE/**"
   workflow_dispatch:
-    inputs:
-      runner:
-        description: "Runner image (macos-14 or macos-15; macos-13 is too old for the iOS 18 SDK)"
-        required: false
-        default: macos-14
 
 permissions:
   contents: write
 
-# This is the ONLY workflow that runs a macOS runner automatically, because
-# macOS minutes are billable on a private repository at the highest rate.
-# Everything else runs on ubuntu (free), and CodeQL-for-Swift plus the
-# VoiceAgentOrb tests are `workflow_dispatch` only for the same reason.
+# Runs on macos-14 rather than macos-15/`macos-latest`. The newest arm64 images
+# are the most contended and the first to be refused or queued; macos-14 still
+# ships an Xcode with the iOS 18 SDK this app targets.
 #
 # One job, ordered cheapest-first so a mistake costs seconds rather than half an
 # hour: parse every Swift file, then build the native framework (cached), then
@@ -28,11 +33,7 @@ concurrency:
 
 jobs:
   build:
-    # macos-14 rather than macos-15/`macos-latest`. The newest arm64 images are
-    # the most contended and get queued first; the older image is easier to
-    # schedule and still ships an Xcode with the iOS 18 SDK this app targets.
-    # Override per run with the `runner` input.
-    runs-on: ${{ inputs.runner || 'macos-14' }}
+    runs-on: macos-14
     timeout-minutes: 300
     steps:
       - name: Checkout
