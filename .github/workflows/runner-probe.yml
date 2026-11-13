@@ -1,0 +1,35 @@
+name: Runner probe
+
+# Temporary diagnostic. It reports which runner labels this repository can
+# actually schedule, and what each image provides. Delete this file once the
+# IPA workflow is running.
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/runner-probe.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  probe:
+    strategy:
+      fail-fast: false
+      matrix:
+        os:
+          - ubuntu-latest
+          - macos-13
+          - macos-14
+          - macos-15
+    runs-on: ${{ matrix.os }}
+    continue-on-error: true
+    steps:
+      - name: Report the image
+        run: |
+          uname -a || true
+          sw_vers || true
+          xcodebuild -version || true
+          xcrun --sdk iphoneos --show-sdk-version || true
+          echo "label=${{ matrix.os }} arch=$(uname -m)"
