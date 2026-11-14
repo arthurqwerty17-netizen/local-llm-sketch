@@ -26,7 +26,7 @@ What GitHub Actions still does is the free half:
    owns this repository.
 2. **Applications → Add application**, pick `local-llm-sketch`, and let Codemagic
    read `codemagic.yaml` from it. Nothing else has to be configured: the file
-   names its own machine (`mac_mini_m2`), Xcode version (`latest`), steps and
+   names its own machine (`mac_mini_m2`), Xcode version (`26.4`), steps and
    artifact.
 3. Press **Start new build**. The IPA appears under the build's artifacts, and
    the log prints its SHA-256 and the app's marketing version.
@@ -45,10 +45,10 @@ To build on every push rather than on demand, uncomment its `triggering` block.
 1. **Install dependencies** — `cmake` and `xcodegen` through Homebrew, CocoaPods
    through RubyGems if the image has no `pod`.
 2. **Install the Metal toolchain** — Xcode 26 ships the Metal compiler as a
-   separate component, and mlx-swift compiles `.metal` kernels, so
-   `xcodebuild -downloadComponent MetalToolchain` runs here, before the
-   expensive steps. The preflight executes `xcrun metal -v`: `xcrun -f metal`
-   alone can find Xcode's launcher even when the Metal component is missing.
+   separate component, and mlx-swift compiles `.metal` kernels. The build checks
+   the compiler by running `xcrun metal -v`, downloads the component if needed,
+   then imports its downloaded DMG into the selected Xcode. Downloading alone
+   leaves the asset in MobileAsset and does not make `metal` executable.
 3. **Fetch submodules** — llama.cpp and whisper.cpp are gitlinks.
 4. **Build llama.cpp** — `scripts/build_native_frameworks.sh --skip-whisper`
    produces `ThirdParty/llama.cpp/build-apple/llama.xcframework`. The server

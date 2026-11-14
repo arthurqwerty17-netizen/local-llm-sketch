@@ -20,7 +20,7 @@ workflows:
     instance_type: mac_mini_m2
 
     environment:
-      xcode: latest
+      xcode: "26.4"
 
     # triggering:
     #   events:
@@ -53,6 +53,16 @@ workflows:
           fi
           xcodebuild -downloadComponent MetalToolchain \
             || sudo xcodebuild -downloadComponent MetalToolchain
+
+          # Downloading places the DMG in MobileAsset; it does not install the
+          # compiler into the selected Xcode. Import that exact downloaded asset.
+          asset_data="$(xcodebuild -showComponent MetalToolchain -json \
+            | /usr/bin/plutil -extract assetPath raw -o - -)"
+          metal_dmg="$(find "$asset_data" -type f -name '*.dmg' -print -quit)"
+          test -n "$metal_dmg"
+          xcodebuild -importComponent MetalToolchain -importPath "$metal_dmg" \
+            || sudo xcodebuild -importComponent MetalToolchain -importPath "$metal_dmg"
+
           xcrun metal -v >/dev/null
           echo "Metal compiler installed: $(xcrun -f metal)"
 
