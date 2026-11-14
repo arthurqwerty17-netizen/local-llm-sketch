@@ -30,11 +30,16 @@ jobs:
   parse:
     runs-on: ubuntu-latest
     container: swift:6.0
+    defaults:
+      run:
+        # The swift image's default shell is `sh`, which has no `pipefail`;
+        # `set -euo pipefail` aborted the step before it parsed anything.
+        shell: bash
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
       - name: Parse Swift sources
         run: |
-          set -euo pipefail
+          set -uo pipefail
           swift --version
           fail=0
           while IFS= read -r file; do
