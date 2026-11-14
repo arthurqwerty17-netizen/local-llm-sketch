@@ -42,6 +42,8 @@ permissions:
 # retired label is never picked up, however long it waits. Only labels in
 # actions/runner-images' README are real; check there before changing this.
 #
+# The repository is public, so standard runners (macOS included) are free.
+#
 # One job, ordered cheapest-first so a mistake costs seconds rather than half an
 # hour: parse every Swift file, then build the native framework (cached), then
 # generate + pod install, then archive.
