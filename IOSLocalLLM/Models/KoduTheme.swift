@@ -164,6 +164,10 @@ struct KoduTheme {
         // other violet-family entries stay available so a user can keep a
         // softer or dirtier purple without leaving the brand family.
         case onyx, system, rose, blue, violet, plum, orchid, lilac, silver, monochrome, electric, emerald, amber, graphite, teal, indigo, coral, magenta
+        // Second wave: deeper and softer neighbours of the signature purple,
+        // plus three restrained non-purple neutrals, so the picker covers a
+        // full range instead of clustering around one hue.
+        case amethyst, periwinkle, mulberry, ink, forest, sandstone
         var id: String { rawValue }
         var displayName: String {
             switch self {
@@ -185,6 +189,12 @@ struct KoduTheme {
             case .indigo: return "Indigo"
             case .coral: return "Coral"
             case .magenta: return "Magenta"
+            case .amethyst: return "Amethyst"
+            case .periwinkle: return "Periwinkle"
+            case .mulberry: return "Mulberry"
+            case .ink: return "Ink"
+            case .forest: return "Forest"
+            case .sandstone: return "Sandstone"
             }
         }
 
@@ -299,6 +309,39 @@ struct KoduTheme {
                 return dark
                     ? (c(0.549,0.451,1.000), c(0.647,0.561,1.000), c(0.451,0.353,0.980), c(0.510,0.412,0.992))
                     : (c(0.361,0.235,0.949), c(0.451,0.310,0.980), c(0.278,0.161,0.808), c(0.318,0.196,0.878))
+            case .amethyst:
+                // Jewel purple: plum pushed brighter and slightly bluer, so the
+                // two purples in the picker are told apart at a glance.
+                return dark
+                    ? (c(0.706,0.529,1.000), c(0.784,0.627,1.000), c(0.596,0.412,0.965), c(0.651,0.471,0.988))
+                    : (c(0.431,0.180,0.878), c(0.553,0.322,0.961), c(0.322,0.098,0.686), c(0.376,0.141,0.796))
+            case .periwinkle:
+                // Blue-leaning soft violet. `strong` still clears white text at
+                // ~6.6:1, so it stays usable on a primary button.
+                return dark
+                    ? (c(0.663,0.663,1.000), c(0.753,0.753,1.000), c(0.549,0.549,0.941), c(0.600,0.600,0.980))
+                    : (c(0.353,0.353,0.855), c(0.463,0.463,0.937), c(0.251,0.243,0.706), c(0.298,0.294,0.800))
+            case .mulberry:
+                // Wine-leaning purple-red, the warmest member of the family.
+                return dark
+                    ? (c(0.855,0.451,0.722), c(0.918,0.561,0.796), c(0.722,0.333,0.596), c(0.796,0.400,0.678))
+                    : (c(0.518,0.129,0.420), c(0.608,0.196,0.502), c(0.408,0.071,0.322), c(0.459,0.098,0.369))
+            case .ink:
+                // Deep navy — near-black in light, a clean steel blue in dark.
+                return dark
+                    ? (c(0.478,0.624,0.878), c(0.580,0.706,0.941), c(0.396,0.529,0.780), c(0.439,0.580,0.839))
+                    : (c(0.098,0.196,0.420), c(0.149,0.259,0.502), c(0.059,0.129,0.298), c(0.078,0.169,0.361))
+            case .forest:
+                // Deep green, deliberately darker and cooler than `emerald`.
+                return dark
+                    ? (c(0.361,0.761,0.580), c(0.471,0.839,0.663), c(0.259,0.639,0.463), c(0.298,0.702,0.522))
+                    : (c(0.098,0.400,0.259), c(0.129,0.459,0.310), c(0.059,0.298,0.180), c(0.078,0.349,0.220))
+            case .sandstone:
+                // Warm paper neutral — the one palette with no hue pull toward
+                // the page canvas, so it sits well on the Sand canvas.
+                return dark
+                    ? (c(0.851,0.741,0.580), c(0.910,0.820,0.678), c(0.741,0.624,0.463), c(0.800,0.682,0.522))
+                    : (c(0.518,0.400,0.259), c(0.580,0.459,0.310), c(0.408,0.298,0.180), c(0.459,0.349,0.220))
             }
         }
     }
@@ -315,6 +358,9 @@ struct KoduTheme {
     /// contrast, the semantic good/warn/bad colors, or the OLED true-black page.
     enum KoduCanvas: String, CaseIterable, Identifiable, Sendable {
         case neutral, lavender, plum, midnight
+        // Second wave: three quiet hue washes and two neutrals. Every one keeps
+        // the same ink and hairline values, so contrast is unchanged.
+        case ocean, moss, sand, blush, graphite
 
         var id: String { rawValue }
 
@@ -324,6 +370,11 @@ struct KoduTheme {
             case .lavender: return "Lavender"
             case .plum:     return "Plum"
             case .midnight: return "Midnight"
+            case .ocean:    return "Ocean"
+            case .moss:     return "Moss"
+            case .sand:     return "Sand"
+            case .blush:    return "Blush"
+            case .graphite: return "Graphite"
             }
         }
 
@@ -333,6 +384,11 @@ struct KoduTheme {
             case .lavender: return "Soft violet wash"
             case .plum:     return "Purple dusk"
             case .midnight: return "Inked slate"
+            case .ocean:    return "Cool deep blue"
+            case .moss:     return "Quiet green wash"
+            case .sand:     return "Warm parchment"
+            case .blush:    return "Soft rose veil"
+            case .graphite: return "Slate neutral"
             }
         }
 
@@ -342,6 +398,11 @@ struct KoduTheme {
             case .lavender: return "square.split.diagonal.2x2"
             case .plum:     return "moonphase.waxing.gibbous"
             case .midnight: return "moon.haze"
+            case .ocean:    return "water.waves"
+            case .moss:     return "leaf.fill"
+            case .sand:     return "sun.haze"
+            case .blush:    return "camera.filters"
+            case .graphite: return "square.stack.3d.up.fill"
             }
         }
 
@@ -353,6 +414,11 @@ struct KoduTheme {
             case .lavender: return Color(red: 0.949, green: 0.945, blue: 0.988)
             case .plum:     return Color(red: 0.957, green: 0.929, blue: 0.976)
             case .midnight: return Color(red: 0.906, green: 0.914, blue: 0.957)
+            case .ocean:    return Color(red: 0.914, green: 0.945, blue: 0.976)
+            case .moss:     return Color(red: 0.929, green: 0.953, blue: 0.925)
+            case .sand:     return Color(red: 0.976, green: 0.957, blue: 0.925)
+            case .blush:    return Color(red: 0.976, green: 0.937, blue: 0.945)
+            case .graphite: return Color(red: 0.937, green: 0.937, blue: 0.945)
             }
         }
 
@@ -364,6 +430,11 @@ struct KoduTheme {
             case .lavender: return Color(red: 0.137, green: 0.133, blue: 0.204)
             case .plum:     return Color(red: 0.129, green: 0.098, blue: 0.180)
             case .midnight: return Color(red: 0.071, green: 0.078, blue: 0.129)
+            case .ocean:    return Color(red: 0.086, green: 0.122, blue: 0.169)
+            case .moss:     return Color(red: 0.086, green: 0.125, blue: 0.106)
+            case .sand:     return Color(red: 0.153, green: 0.133, blue: 0.110)
+            case .blush:    return Color(red: 0.161, green: 0.110, blue: 0.129)
+            case .graphite: return Color(red: 0.098, green: 0.098, blue: 0.110)
             }
         }
 

@@ -1,47 +1,86 @@
 # CI on this repository
 
-## What was wrong
+## What the logs actually say
 
-Every job stopped before its first step with:
+Two different things were happening, and they need different fixes.
+
+**The two `ubuntu-latest` jobs** (`validate.yml` → `repository` and `parse`)
+failed in about one second each, before running a single step:
 
 ```
 The job was not started because recent account payments have failed
 or your spending limit needs to be increased.
 ```
 
-The newest macOS arm64 images (`macos-15`, `macos-latest`) are the most
-contended and are refused/queued first, so the fix is to ask for an older image.
+That message is an **account-level Actions block**. It cannot come from macOS
+capacity, because neither job asks for a macOS runner: they are free Linux jobs.
+While it is in place, *every* job on this account is refused — Linux included —
+so nothing in this repository is being compiled or tested at all.
 
-**All macOS jobs now target `macos-14`**, which schedules far more reliably and
-still ships an Xcode with the iOS 18 SDK this app needs. The build job also
-takes a `runner` input, so a manual run can pick `macos-15` when that is the one
-with capacity.
+**The macOS `build` job** is the separate case. It sat in `queued`, which is what
+a job does when it is waiting for a runner rather than being refused. Two things
+can cause that, and both were true here:
 
-If a run still refuses to start, the account itself has no Actions capacity
-left — see *If it still will not start* at the bottom.
+1. **The label it asked for no longer exists.** The workflow was moved to
+   `macos-13` by an earlier "use an older image" change, but GitHub had already
+   retired macOS 13, so `macos-13` is not in the `actions/runner-images`
+   catalogue. The change before that had used `macos-14`, which was retired on
+   **2026-11-02** — also gone. A job asking for a retired label is never picked
+   up: it waits in `queued` indefinitely. Both attempts to pick a safer older
+   image were pointing at images that no longer existed.
+2. **Standard macOS runners are contended.** Standard arm64 images queue behind
+   larger runners under load, which is the effect named in the original report.
+   That is a real cost of the standard pool, but it is a delay, not a refusal.
+
+## Runner images that exist right now
+
+From `actions/runner-images` (its README is the authority; a label is only real
+if it is listed there):
+
+| Label | Arch | State |
+| --- | --- | --- |
+| `macos-15` | arm64 | GA — **the default here** |
+| `macos-15-intel` | x64 | GA, the other pool |
+| `macos-26` / `macos-latest` | arm64 | GA, newest |
+| `xcode-27` | arm64 | preview |
+| `macos-14` | — | **removed 2026-11-02**; the previous default here |
+| `macos-13` | — | **removed earlier**; the default before that |
+
+`macos-14` is listed as **x64**, not arm64 — the old arm64 `macos-14` label is
+gone, which is why an earlier note about an unsupported `macos-14-arm64-us-xl`
+configuration was misleading. Do not assume an image's architecture from its
+version; check the table.
 
 ## What changed here
 
-The workflow set was cut down so a push spends as little as possible:
+- **`build-ipa.yml` defaults to `macos-15`** (arm64, GA) instead of the removed
+  `macos-13`.
+- **A `runner` dropdown** on manual dispatch offers `macos-15`, `macos-26` and
+  `macos-15-intel`, so a run can move to whichever live image schedules without
+  editing the file. Pushes use `macos-15`.
+- `codeql.yml`, `packages.yml` and `runner-probe.yml` were moved off `macos-14`
+  (retired 2026-11-02) to labels that still exist.
+- The workflow set stays as small as it can be: one billable job for the
+  artifact, and free Linux jobs for everything else.
 
 | Workflow | Runner | Trigger | Billable |
 | --- | --- | --- | --- |
-| `validate.yml` → repository | ubuntu | push, PR | no |
-| `validate.yml` → swift-syntax | ubuntu (`swift:5.10`) | push, PR | no |
+| `validate.yml` → `repository` | ubuntu | push, PR | no |
+| `validate.yml` → `parse` | ubuntu, `swift:6.0` container | push, PR | no |
 | `dco.yml`, `dependency-review.yml` | ubuntu | PR | no |
 | `source-release.yml` | ubuntu | version tag | no |
 | `scorecard.yml` | ubuntu | manual | no |
-| `codeql.yml` | **macos-14** | weekly cron, manual | yes |
-| `packages.yml` | **macos-14** | manual | yes |
-| **`build-ipa.yml`** | **macos-14** (input can raise it) | push to `main`/`preview`, manual | **yes** |
+| `codeql.yml` | `macos-15` | weekly cron, manual | yes |
+| `packages.yml` | `macos-15` | manual | yes |
+| **`build-ipa.yml`** | **`macos-15`** (dropdown can raise it) | push to `main`/`preview`, manual | **yes** |
 
-Before: four macOS jobs fired on every push (two in `build-ipa.yml`, plus
-`codeql.yml` and the VoiceAgentOrb tests inside `validate.yml`). One artifact
-now costs one macOS job.
+## Why an image change alone will not produce an IPA
 
-`validate.yml` also gained a free Swift **parse** job: a `swift:5.10` container
-parses every source file. It cannot type-check UIKit, SwiftUI or WebKit, but it
-catches syntax errors, which otherwise only surface after a full macOS archive.
+The billing refusal above is not about macOS. Until it is cleared, the Linux
+jobs fail too, so no workflow can run at all — and a queue position cannot fix a
+refused job. Both halves have to be true for a build to happen: **an account
+with Actions capacity, and a runner label that still exists.** The second half is
+now fixed here; the first is not something a workflow can change.
 
 ## Getting an IPA out
 
@@ -84,17 +123,21 @@ zip -qry LocalLLMSketch.ipa Payload
 
 ## What the free check proves, and what it does not
 
-`swift-syntax` proves every file **parses**. It cannot prove that a symbol
+The `parse` job proves every file **parses**. It cannot prove that a symbol
 exists, that argument labels match, that an `import` resolves (UIKit, SwiftUI
 and WebKit are Apple-only), or that the Xcode project references every file —
 `project.yml` and `xcodegen` own that last part. Those only fail in a real macOS
 archive, which is exactly why that one job exists.
 
-## If it still will not start
+## If the build job stays queued
 
-The start refusal names billing explicitly. If `macos-14` is refused too, the
-account has no Actions capacity for macOS at all, and no workflow change can
-get around that. Two things work regardless:
+Try, in order:
 
-- **Make the repository public.** Public repositories get free macOS minutes.
-- **Build on a Mac you own.** The commands are above.
+1. **Run workflow** with `runner` set to `macos-15-intel` — a different pool, and
+   the artifact is identical (device slices are arm64 either way).
+2. **Run workflow** with `runner` set to `macos-26`.
+3. Wait — standard macOS runners drain in cycles; a queued job usually starts
+   eventually unless the label is retired.
+
+If a job fails in about a second instead of waiting, it is the billing block, not
+the runner.

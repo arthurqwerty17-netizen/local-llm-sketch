@@ -17,21 +17,30 @@ on:
   workflow_dispatch:
     inputs:
       runner:
-        description: "Runner image. macos-13 schedules here; macos-14/15 need capacity or a paid plan."
+        description: "Runner image. macos-15 is the oldest live arm64 image, so it is the default; macos-15-intel is the other pool."
         type: choice
         options:
-          - macos-13
-          - macos-14
           - macos-15
-        default: macos-13
+          - macos-26
+          - macos-15-intel
+        default: macos-15
 
 permissions:
   contents: write
 
-# Runs on macos-13. On this account `macos-14` resolves to a large arm64 SKU that
-# is not supported ("configuration 'macos-14-arm64-us-xl' is not supported") and
-# `macos-15` is refused for capacity, while macos-13 schedules. Pick a different
-# image from the runner dropdown when a newer one becomes available.
+# Runner images, per actions/runner-images:
+#
+#   macos-15        arm64, GA, the oldest live arm64 image   <- default
+#   macos-15-intel  x64,  GA, the oldest live Intel image
+#   macos-26        arm64, GA, newest (macos-latest)
+#   xcode-27        arm64, preview
+#   macos-14        REMOVED 2026-11-02
+#   macos-13        REMOVED earlier, and this workflow targeted it until now
+#
+# Both "older is safer" defaults of the last two commits were images that no
+# longer exist, which is why the build never scheduled: a job asking for a
+# retired label is never picked up, however long it waits. Only labels in
+# actions/runner-images' README are real; check there before changing this.
 #
 # One job, ordered cheapest-first so a mistake costs seconds rather than half an
 # hour: parse every Swift file, then build the native framework (cached), then
@@ -43,7 +52,7 @@ concurrency:
 
 jobs:
   build:
-    runs-on: ${{ inputs.runner || 'macos-13' }}
+    runs-on: ${{ inputs.runner || 'macos-15' }}
     timeout-minutes: 300
     steps:
       - name: Checkout

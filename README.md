@@ -25,9 +25,11 @@ The IPA is built by `Build IPA`, which checks out the submodules, builds
 `llama.xcframework`, runs `xcodegen generate` and `pod install`, archives,
 packages, and attaches the IPA to a release tagged `v<version>-<build>`.
 
-**That workflow needs a macOS runner.** It targets `macos-14` because the newest
-arm64 images are the most contended; if Releases is still empty, read
-[Docs/CI.md](Docs/CI.md) for the runner and billing options.
+**That workflow needs a macOS runner.** It targets `macos-15` (arm64, GA).
+Earlier defaults were `macos-13` and then `macos-14` — both retired — and a job
+asking for a retired label never schedules. A manual run can pick `macos-26` or
+`macos-15-intel` from the `runner` dropdown instead. If Releases is still empty,
+read [Docs/CI.md](Docs/CI.md) for the runner and billing options.
 
 ## What the assistant can do here
 
@@ -74,9 +76,16 @@ bar, desktop mode, downloads onto the shelf, and the live AI activity strip.
 
 ## Theme
 
-Four appearances (System, Light, Dark, OLED), and accents including **Plum**
-(the default), Orchid, Lilac, Silver, Monochrome and Electric, plus four page
-canvases. The canvas tints only the page fill, so ink contrast and the semantic
+Four appearances (System, Light, Dark, OLED), **24 accents** and **9 page
+canvases**.
+
+Accents, purple first: **Plum** (the default), Amethyst, Orchid, Lilac,
+Periwinkle, Electric, Violet, Mulberry, Magenta, Ink, Indigo, Blue, System,
+Teal, Emerald, Forest, Coral, Rose, Amber, Sandstone, Silver, Graphite,
+Monochrome, Onyx.
+
+Canvases: Neutral, Lavender, Plum, Midnight, Ocean, Moss, Sand, Blush, Graphite.
+A canvas tints only the page fill, so ink contrast and the semantic
 red/amber/green never move; OLED keeps its true-black page and locks the canvas.
 
 The mark is drawn in code (`IOSLocalLLM/LASLogoMark.swift`): a purple tile, one

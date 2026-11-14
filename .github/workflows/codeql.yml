@@ -19,7 +19,7 @@ concurrency:
 jobs:
   swift:
     name: Swift security analysis
-    runs-on: macos-14
+    runs-on: macos-15
     timeout-minutes: 120
     permissions:
       contents: read
