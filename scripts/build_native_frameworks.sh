@@ -42,11 +42,12 @@ elif git -C "$llama_root" apply --check "$llama_patch" >/dev/null 2>&1; then
   git -C "$llama_root" apply "$llama_patch"
   llama_ios_only=1
 else
-  # A submodule revision that does not match the tracked patch is still usable:
-  # the upstream script builds every slice, which takes longer but produces the
-  # iOS framework this target links. Warn instead of failing the build.
-  echo "warning: the llama.cpp build patch does not apply to this revision;" >&2
-  echo "         building all slices with the upstream script instead" >&2
+  # Current llama.cpp takes the slices as arguments instead of an IOS_ONLY
+  # switch, so the patch is obsolete there. Ask for the two iOS slices by name;
+  # without them the script builds macOS, visionOS and tvOS as well, which
+  # triples the build time for a framework this app never links.
+  echo "==> The tracked patch does not apply; requesting iOS slices by name"
+  llama_ios_only=2
 fi
 
 if [[ -e "${llama_root}/build-apple/llama.xcframework" ]]; then
@@ -60,7 +61,10 @@ if [[ -e "${repository_root}/ThirdParty/whisper.cpp/build-apple/whisper.xcframew
 fi
 
 echo "==> Building llama.cpp iOS XCFramework"
-(cd "$llama_root" && IOS_ONLY="$llama_ios_only" ./build-xcframework.sh)
+case "$llama_ios_only" in
+  2) (cd "$llama_root" && ./build-xcframework.sh ios-sim ios-device) ;;
+  *) (cd "$llama_root" && IOS_ONLY=1 ./build-xcframework.sh) ;;
+esac
 
 if [[ "$skip_whisper" == 0 ]]; then
   echo "==> Building whisper.cpp iOS XCFramework"

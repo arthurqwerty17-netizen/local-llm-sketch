@@ -141,3 +141,33 @@ Try, in order:
 
 If a job fails in about a second instead of waiting, it is the billing block, not
 the runner.
+
+## Verified build — 2026-11-14
+
+The tree was compiled for the first time on a remote Mac (Xcode 27.1, arm64):
+
+- `xcodegen generate` and `pod install` succeed.
+- `xcodebuild build -configuration Debug -destination 'generic/platform=iOS Simulator'` — **succeeds**.
+- `xcodebuild build -configuration Release -destination 'generic/platform=iOS'` — **succeeds**;
+  the unsigned `OnDeviceLAS.app` packages into a 29 MB IPA.
+- `xcodebuild archive` fails *on that particular machine* with
+  `unable to spawn process '/usr/sbin/chown' (Operation not permitted)` from
+  SwiftPM targets. That is a sandbox restriction of the remote build host, not of
+  the project; GitHub's own runners have no such restriction, so `Build IPA`
+  archives normally there.
+
+On a similarly restricted host, use `build` plus a manual `Payload/` zip instead
+of `archive`:
+
+```bash
+xcodebuild -workspace OnDeviceLAS.xcworkspace -scheme OnDeviceLAS \
+  -configuration Release -destination 'generic/platform=iOS' \
+  -derivedDataPath build/dd build \
+  CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY=""
+mkdir -p Payload && cp -R build/dd/Build/Products/Release-iphoneos/*.app Payload/
+zip -qry LocalLLMSketch.ipa Payload
+```
+
+Six compile errors were fixed to get there: `Result<_, String>` (String is not
+an `Error`), a nonisolated read of MainActor state, a missing `ObservedObject`,
+and llama.cpp's new `llama_sampler_init_penalties` signature.
