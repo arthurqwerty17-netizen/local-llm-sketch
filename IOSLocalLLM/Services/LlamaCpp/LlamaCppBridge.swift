@@ -259,18 +259,20 @@ final class LlamaCppVLM: @unchecked Sendable {
 
     /// Canonical llama.cpp order: penalties -> top-k -> top-p -> temp -> dist.
     ///
-    /// `llama_sampler_init_penalties` takes the vocabulary size as its first
-    /// argument in current llama.cpp, so the caller passes it in.
+    /// The pinned revision in `ThirdParty/llama.cpp` declares
+    /// `llama_sampler_init_penalties(last_n, repeat, freq, present)`: four
+    /// arguments, no vocabulary size. Newer llama.cpp revisions insert the
+    /// vocabulary size as the first argument, so bumping the submodule means
+    /// updating this call too.
     private static func makeSampler(
-        _ spec: LlamaCppSamplerSpec,
-        vocabSize: Int32
+        _ spec: LlamaCppSamplerSpec
     ) -> UnsafeMutablePointer<llama_sampler>? {
         let params = llama_sampler_chain_default_params()
         guard let chain = llama_sampler_chain_init(params) else { return nil }
         if abs(spec.repetitionPenalty - 1) > 0.001 {
             llama_sampler_chain_add(
                 chain,
-                llama_sampler_init_penalties(vocabSize, 64, spec.repetitionPenalty, 0, 0)
+                llama_sampler_init_penalties(64, spec.repetitionPenalty, 0, 0)
             )
         }
         if spec.topK > 0 {
@@ -322,10 +324,7 @@ final class LlamaCppVLM: @unchecked Sendable {
         let ownedSampler: UnsafeMutablePointer<llama_sampler>?
         let samp: UnsafeMutablePointer<llama_sampler>
         if let samplerSpec {
-            guard let created = Self.makeSampler(
-                samplerSpec,
-                vocabSize: llama_vocab_n_tokens(llama_model_get_vocab(m))
-            ) else {
+            guard let created = Self.makeSampler(samplerSpec) else {
                 throw LlamaCppError.contextInitFailed
             }
             ownedSampler = created

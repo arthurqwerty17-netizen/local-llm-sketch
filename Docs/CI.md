@@ -170,4 +170,16 @@ zip -qry LocalLLMSketch.ipa Payload
 
 Six compile errors were fixed to get there: `Result<_, String>` (String is not
 an `Error`), a nonisolated read of MainActor state, a missing `ObservedObject`,
-and llama.cpp's new `llama_sampler_init_penalties` signature.
+and llama.cpp's `llama_sampler_init_penalties` signature.
+
+## The llama.cpp pin decides the sampler signature
+
+`ThirdParty/llama.cpp` is a submodule gitlink pinned to
+`7ef790f90a4772eadd6966815f6d3ae7d93c7e03`, and `Build IPA` builds exactly that
+revision. At that pin `llama_sampler_init_penalties` takes four arguments —
+`(penalty_last_n, penalty_repeat, penalty_freq, penalty_present)` — so
+`LlamaCppBridge.makeSampler` calls it that way. Newer llama.cpp revisions
+insert the vocabulary size as the first argument; building against such a
+revision without updating the call is a compile error, and building HEAD by hand
+is what hid the difference until CI hit the Archive step. When the submodule is
+bumped, change that one call and let CI confirm it.
