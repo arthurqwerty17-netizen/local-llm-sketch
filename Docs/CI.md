@@ -47,7 +47,8 @@ To build on every push rather than on demand, uncomment its `triggering` block.
 2. **Install the Metal toolchain** — Xcode 26 ships the Metal compiler as a
    separate component, and mlx-swift compiles `.metal` kernels, so
    `xcodebuild -downloadComponent MetalToolchain` runs here, before the
-   expensive steps, and the step fails if `xcrun -f metal` still finds nothing.
+   expensive steps. The preflight executes `xcrun metal -v`: `xcrun -f metal`
+   alone can find Xcode's launcher even when the Metal component is missing.
 3. **Fetch submodules** — llama.cpp and whisper.cpp are gitlinks.
 4. **Build llama.cpp** — `scripts/build_native_frameworks.sh --skip-whisper`
    produces `ThirdParty/llama.cpp/build-apple/llama.xcframework`. The server

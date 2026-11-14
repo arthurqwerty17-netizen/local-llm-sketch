@@ -44,13 +44,17 @@ workflows:
       - name: Install Metal toolchain
         script: |
           set -euo pipefail
-          if xcrun -f metal >/dev/null 2>&1; then
-            echo "Metal compiler already present: $(xcrun -f metal)"
+          # `xcrun -f metal` can resolve Xcode's launcher even when the
+          # separately downloaded Metal toolchain is absent. Execute the
+          # compiler so this preflight catches that state too.
+          if xcrun metal -v >/dev/null 2>&1; then
+            echo "Metal compiler already usable: $(xcrun -f metal)"
             exit 0
           fi
           xcodebuild -downloadComponent MetalToolchain \
             || sudo xcodebuild -downloadComponent MetalToolchain
-          xcrun -f metal
+          xcrun metal -v >/dev/null
+          echo "Metal compiler installed: $(xcrun -f metal)"
 
       - name: Fetch submodules
         script: |
