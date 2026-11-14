@@ -9,9 +9,10 @@
 # `triggering` below to build on every push to `main`.
 #
 # The steps mirror what a successful local build does (see Docs/CI.md):
-# submodules, the llama.cpp XCFramework, xcodegen + CocoaPods, then `build`
-# rather than `archive` — an unsigned sideload IPA needs no archive, and
-# `build` works on hosts where `archive` fails on SwiftPM file ownership.
+# the Metal toolchain, submodules, the llama.cpp XCFramework, xcodegen +
+# CocoaPods, then `build` rather than `archive` — an unsigned sideload IPA needs
+# no archive, and `build` works on hosts where `archive` fails on SwiftPM file
+# ownership.
 workflows:
   ios-build:
     name: Local LLM Sketch - Unsigned IPA
@@ -35,6 +36,21 @@ workflows:
           if ! command -v pod >/dev/null; then
             sudo gem install cocoapods --no-document
           fi
+
+      # Xcode 26 ships the Metal compiler as a separate downloadable component.
+      # Without it mlx-swift's Metal kernels fail with "cannot execute tool
+      # 'metal' due to missing Metal Toolchain" and the whole build stops, so
+      # install it before the expensive steps rather than after them.
+      - name: Install Metal toolchain
+        script: |
+          set -euo pipefail
+          if xcrun -f metal >/dev/null 2>&1; then
+            echo "Metal compiler already present: $(xcrun -f metal)"
+            exit 0
+          fi
+          xcodebuild -downloadComponent MetalToolchain \
+            || sudo xcodebuild -downloadComponent MetalToolchain
+          xcrun -f metal
 
       - name: Fetch submodules
         script: |

@@ -16,8 +16,9 @@ and intends to use semantic version tags for source releases.
 - JIT and unsigned-executable-memory entitlements in
   `IOSLocalLLM.entitlements`, for sideload signing paths that preserve them.
 - `codemagic.yaml`: one Codemagic workflow that builds everything the IPA needs —
-  pinned submodules, `llama.xcframework`, XcodeGen, CocoaPods, compile, package —
-  and prints the IPA's SHA-256 and version in its log.
+  the Metal toolchain, pinned submodules, `llama.xcframework`, XcodeGen,
+  CocoaPods, compile, package — and prints the IPA's SHA-256 and version in its
+  log.
 - `scripts/build_native_frameworks.sh --skip-whisper` for CI, which does not
   link whisper.cpp.
 

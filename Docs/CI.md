@@ -44,23 +44,31 @@ To build on every push rather than on demand, uncomment its `triggering` block.
 
 1. **Install dependencies** — `cmake` and `xcodegen` through Homebrew, CocoaPods
    through RubyGems if the image has no `pod`.
-2. **Fetch submodules** — llama.cpp and whisper.cpp are gitlinks.
-3. **Build llama.cpp** — `scripts/build_native_frameworks.sh --skip-whisper`
+2. **Install the Metal toolchain** — Xcode 26 ships the Metal compiler as a
+   separate component, and mlx-swift compiles `.metal` kernels, so
+   `xcodebuild -downloadComponent MetalToolchain` runs here, before the
+   expensive steps, and the step fails if `xcrun -f metal` still finds nothing.
+3. **Fetch submodules** — llama.cpp and whisper.cpp are gitlinks.
+4. **Build llama.cpp** — `scripts/build_native_frameworks.sh --skip-whisper`
    produces `ThirdParty/llama.cpp/build-apple/llama.xcframework`. The server
    target does not link whisper.cpp, so its slice is skipped.
-4. **Generate the workspace** — `xcodegen generate` from `project.yml`, then
+5. **Generate the workspace** — `xcodegen generate` from `project.yml`, then
    `pod install`.
-5. **Compile** — `xcodebuild build`, not `archive`. An unsigned sideload IPA
+6. **Compile** — `xcodebuild build`, not `archive`. An unsigned sideload IPA
    needs no archive, and `build` succeeds on hosts where `archive` fails on
    SwiftPM file ownership.
-6. **Package** — `Payload/` plus `zip` into `LocalLLMSketch.ipa`.
+7. **Package** — `Payload/` plus `zip` into `LocalLLMSketch.ipa`.
 
 ## If a build fails
 
-Read the step's log in Codemagic. The two failures seen so far:
+Read the step's log in Codemagic. The failures seen so far:
 
 - **`error: GitHub Actions must be pinned to full commit SHAs`** — that is the
   `validate` job, not the build; every `uses:` must carry a 40-character SHA.
+- **`cannot execute tool 'metal' due to missing Metal Toolchain`** at the Compile
+  step, in `CompileMetalFile …/mlx-swift/…/rope.metal` — the Xcode on the image
+  has no Metal compiler installed. The "Install Metal toolchain" step handles
+  it; if it reappears, that step's log says whether the download failed.
 - **A Swift compile error at the Compile step** — a real code error. The `parse`
   job in `validate.yml` catches syntax only; type errors and missing symbols
   only appear here.
