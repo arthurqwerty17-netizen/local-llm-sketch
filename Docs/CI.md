@@ -45,10 +45,13 @@ To build on every push rather than on demand, uncomment its `triggering` block.
 1. **Install dependencies** — `cmake` and `xcodegen` through Homebrew, CocoaPods
    through RubyGems if the image has no `pod`.
 2. **Install the Metal toolchain** — Xcode 26 ships the Metal compiler as a
-   separate component, and mlx-swift compiles `.metal` kernels. The build checks
-   the compiler by running `xcrun metal -v`, downloads the component if needed,
-   then imports its downloaded DMG into the selected Xcode. Downloading alone
-   leaves the asset in MobileAsset and does not make `metal` executable.
+   separate component, and mlx-swift compiles `.metal` kernels. The build runs
+   `xcrun metal -v` to check for it and, if it is missing, lets Xcode install the
+   component itself: `xcodebuild -runFirstLaunch`, then
+   `sudo xcodebuild -downloadComponent MetalToolchain`, repeated once because a
+   second run installs an already downloaded component. The DMG Xcode caches is
+   never fetched or imported by hand — it is not a standalone installer, and
+   `-importComponent` rejects it as having "invalid contents or metadata".
 3. **Fetch submodules** — llama.cpp and whisper.cpp are gitlinks.
 4. **Build llama.cpp** — `scripts/build_native_frameworks.sh --skip-whisper`
    produces `ThirdParty/llama.cpp/build-apple/llama.xcframework`. The server
@@ -69,7 +72,13 @@ Read the step's log in Codemagic. The failures seen so far:
 - **`cannot execute tool 'metal' due to missing Metal Toolchain`** at the Compile
   step, in `CompileMetalFile …/mlx-swift/…/rope.metal` — the Xcode on the image
   has no Metal compiler installed. The "Install Metal toolchain" step handles
-  it; if it reappears, that step's log says whether the download failed.
+  it. If that step itself fails, it could not make Xcode install the component:
+  its log shows the result of `xcodebuild -showComponent MetalToolchain -json`,
+  which says whether the asset is absent, staged, or installed.
+- **`The provided .dmg cannot be imported due to invalid contents or metadata`**
+  — an older version of this build downloaded the Metal Toolchain DMG and fed it
+  to `xcodebuild -importComponent`. That is not how the component installs;
+  `-downloadComponent` alone does it. Keep the download out of the script.
 - **A Swift compile error at the Compile step** — a real code error. The `parse`
   job in `validate.yml` catches syntax only; type errors and missing symbols
   only appear here.

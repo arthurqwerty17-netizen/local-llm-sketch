@@ -41,29 +41,44 @@ workflows:
       # Without it mlx-swift's Metal kernels fail with "cannot execute tool
       # 'metal' due to missing Metal Toolchain" and the whole build stops, so
       # install it before the expensive steps rather than after them.
+      #
+      # Xcode installs this component itself: `xcodebuild -downloadComponent`
+      # downloads it and puts it into the selected Xcode. Never download the DMG
+      # by hand or feed it to `-importComponent` — the copy Xcode caches is not a
+      # standalone installer and import fails with "invalid contents or metadata".
       - name: Install Metal toolchain
         script: |
           set -euo pipefail
+
           # `xcrun -f metal` can resolve Xcode's launcher even when the
-          # separately downloaded Metal toolchain is absent. Execute the
-          # compiler so this preflight catches that state too.
-          if xcrun metal -v >/dev/null 2>&1; then
+          # component is absent. Execute the compiler so this preflight catches
+          # that state too.
+          metal_ready() { xcrun metal -v >/dev/null 2>&1; }
+
+          if metal_ready; then
             echo "Metal compiler already usable: $(xcrun -f metal)"
             exit 0
           fi
-          xcodebuild -downloadComponent MetalToolchain \
-            || sudo xcodebuild -downloadComponent MetalToolchain
 
-          # Downloading places the DMG in MobileAsset; it does not install the
-          # compiler into the selected Xcode. Import that exact downloaded asset.
-          asset_data="$(xcodebuild -showComponent MetalToolchain -json \
-            | /usr/bin/plutil -extract assetPath raw -o - -)"
-          metal_dmg="$(find "$asset_data" -type f -name '*.dmg' -print -quit)"
-          test -n "$metal_dmg"
-          xcodebuild -importComponent MetalToolchain -importPath "$metal_dmg" \
-            || sudo xcodebuild -importComponent MetalToolchain -importPath "$metal_dmg"
+          # The component is written inside Xcode.app, which the build user may
+          # not own, so let Xcode's own installer run as root. A download that
+          # cannot install leaves the asset staged and `metal` still missing,
+          # which is what an unprivileged run does.
+          sudo xcodebuild -runFirstLaunch || true
+          sudo xcodebuild -downloadComponent MetalToolchain \
+            || xcodebuild -downloadComponent MetalToolchain || true
 
-          xcrun metal -v >/dev/null
+          # A second run installs a component that is already downloaded.
+          if ! metal_ready; then
+            sudo xcodebuild -downloadComponent MetalToolchain || true
+          fi
+
+          if ! metal_ready; then
+            echo "error: Xcode did not install the Metal Toolchain component." >&2
+            xcodebuild -showComponent MetalToolchain -json || true
+            exit 1
+          fi
+
           echo "Metal compiler installed: $(xcrun -f metal)"
 
       - name: Fetch submodules
