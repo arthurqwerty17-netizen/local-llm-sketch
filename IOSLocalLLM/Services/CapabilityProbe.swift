@@ -17,7 +17,9 @@ import Darwin
 enum CapabilityProbe {
 
     /// True when this process may allocate executable memory at runtime.
-    static private(set) lazy var jitAvailable: Bool = probeJIT()
+    /// Static storage is already lazily initialised, so this costs one `mmap`
+    /// the first time anything asks.
+    static private(set) var jitAvailable: Bool = probeJIT()
 
     private static func probeJIT() -> Bool {
         let length = Int(getpagesize())
@@ -29,7 +31,7 @@ enum CapabilityProbe {
             -1,
             0
         )
-        guard address != MAP_FAILED, let address else { return false }
+        guard let address, address != MAP_FAILED else { return false }
         munmap(address, length)
         return true
     }
