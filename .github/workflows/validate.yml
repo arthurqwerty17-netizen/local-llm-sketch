@@ -5,6 +5,9 @@ on:
     branches:
       - main
   pull_request:
+  # The app's `github_build` tool dispatches this workflow, and the workflow
+  # dispatch API only accepts workflows that declare this trigger.
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -16,9 +19,10 @@ permissions:
 #   parse      — every Swift file parsed by a Swift toolchain in a Linux
 #                container. It cannot type-check UIKit/SwiftUI/WebKit, but it
 #                catches syntax errors, which is the class of mistake that
-#                otherwise only shows up 30 minutes into a paid macOS build.
+#                otherwise only shows up in a macOS build.
 #
-# The one macOS job that matters is build-ipa.yml.
+# The app itself is compiled by Codemagic, not here: see codemagic.yaml at the
+# repository root. This file is the whole GitHub Actions set for the build.
 jobs:
   repository:
     runs-on: ubuntu-latest

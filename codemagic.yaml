@@ -1,0 +1,115 @@
+# Codemagic build for the unsigned sideload IPA.
+#
+# This replaces the GitHub Actions macOS job. `.github/workflows/build-ipa.yml`
+# is gone; Actions now runs only the free Linux checks in `validate.yml`, and
+# the app is compiled here instead.
+#
+# To use it: Codemagic -> Applications -> add this repository. Codemagic reads
+# this file from the branch it builds. Start a build from its UI, or uncomment
+# `triggering` below to build on every push to `main`.
+#
+# The steps mirror what a successful local build does (see Docs/CI.md):
+# submodules, the llama.cpp XCFramework, xcodegen + CocoaPods, then `build`
+# rather than `archive` — an unsigned sideload IPA needs no archive, and
+# `build` works on hosts where `archive` fails on SwiftPM file ownership.
+workflows:
+  ios-build:
+    name: Local LLM Sketch - Unsigned IPA
+    max_build_duration: 120
+    instance_type: mac_mini_m2
+
+    environment:
+      xcode: latest
+
+    # triggering:
+    #   events:
+    #     - push
+    #   branch_patterns:
+    #     - pattern: main
+    #       include: true
+
+    scripts:
+      - name: Install dependencies
+        script: |
+          brew install cmake xcodegen
+          if ! command -v pod >/dev/null; then
+            sudo gem install cocoapods --no-document
+          fi
+
+      - name: Fetch submodules
+        script: |
+          git submodule update --init --recursive
+
+      - name: Build llama.cpp
+        script: |
+          ./scripts/build_native_frameworks.sh --skip-whisper
+
+      - name: Generate Xcode workspace
+        script: |
+          xcodegen generate
+          pod install
+
+      - name: Compile iOS application
+        script: |
+          set -euo pipefail
+
+          xcodebuild \
+            -workspace OnDeviceLAS.xcworkspace \
+            -scheme OnDeviceLAS \
+            -configuration Release \
+            -destination 'generic/platform=iOS' \
+            -derivedDataPath build/dd \
+            build \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY=""
+
+      - name: Package IPA
+        script: |
+          set -euo pipefail
+          mkdir -p Payload
+
+          APP_PATH="$(find build/dd/Build/Products/Release-iphoneos \
+            -maxdepth 1 -name '*.app' -print -quit)"
+
+          test -n "$APP_PATH"
+          cp -R "$APP_PATH" Payload/
+          zip -qry LocalLLMSketch.ipa Payload
+
+          # Exported so the release tag can be `v<version>-<build>`, the scheme
+          # the repository used before; Docs/RELEASE_VERIFICATION.md reads them.
+          version="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$APP_PATH/Info.plist")"
+          build="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleVersion' "$APP_PATH/Info.plist")"
+          digest="$(shasum -a 256 LocalLLMSketch.ipa | awk '{ print $1 }')"
+          echo "APP_VERSION=$version" >>"$CM_ENV"
+          echo "APP_BUILD=$build" >>"$CM_ENV"
+          echo "IPA_SHA256=$digest" >>"$CM_ENV"
+          echo "Local LLM Sketch $version ($build)"
+          echo "SHA-256 $digest"
+          ls -l LocalLLMSketch.ipa
+
+    artifacts:
+      - LocalLLMSketch.ipa
+
+# Publishing the IPA as a GitHub Release needs a GitHub integration first:
+# Codemagic -> Teams -> Integrations -> GitHub, then put its name in
+# `environment.integrations.github` and uncomment the block below. Until then
+# the IPA is a build artifact you download from the Codemagic build page.
+#
+# environment:
+#   integrations:
+#     github: <integration name>
+#
+# publishing:
+#   github_releases:
+#     - name: Local LLM Sketch $APP_VERSION-$APP_BUILD
+#       tag: v$APP_VERSION-$APP_BUILD
+#       commit: $CM_COMMIT
+#       release_notes: |
+#         Unsigned IPA built from $CM_BRANCH at $CM_COMMIT.
+#
+#         SHA-256: $IPA_SHA256
+#
+#         Sideload it with AltStore, SideStore, Sideloadly, or TrollStore.
+#       draft: false
+#       prerelease: false

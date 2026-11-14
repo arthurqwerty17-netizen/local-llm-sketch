@@ -67,8 +67,10 @@ enum AgentCapabilityBrief {
             • github_repo_files() lists the repository's tree.
             • github_read(path) reads a file from the repository.
             • github_commit(path, text, message) commits one file to the default branch.
-            • github_build() dispatches the build-ipa workflow, which archives the app,
-              uploads the IPA, and attaches it to a GitHub Release.
+            • github_build() dispatches the validate workflow in Actions, which parses
+              every Swift file. The IPA is not built there: it is built by Codemagic
+              from codemagic.yaml, and you cannot start that from this app — tell the
+              user to start it on codemagic.io.
             • github_runs() reports the latest Actions runs.
             """)
         } else {
@@ -86,7 +88,7 @@ enum AgentCapabilityBrief {
         profile with get-task-allow). That is a prerequisite for an emulator, not
         an emulator: there is no Arch or Debian image on this device and no
         hypervisor. Do not claim to have started Linux. For real shell work, use
-        `shell` (audited commands above) or dispatch the Actions build, which is
+        `shell` (audited commands above) or dispatch a GitHub Actions run, which is
         a real Ubuntu runner.
         """)
 
@@ -127,7 +129,7 @@ enum AgentCapabilityBrief {
       • github_commit(path: string, text: string, message: string)
           — commit one file to the linked repository
       • github_build()
-          — dispatch the build-ipa workflow in Actions
+          — dispatch the validate workflow in Actions (parses Swift; does not build the IPA)
       • github_runs()
           — latest Actions runs for the linked repository
     """

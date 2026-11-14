@@ -5,7 +5,6 @@ A sideload-only fork of [OnDevice LLM](https://github.com/Mesutcydev/ios-local-l
 with an in-app browser the model can drive, a Files shelf it can read and write,
 GitHub commit and CI dispatch, and a purple-first theme.
 
-[![Build IPA](https://github.com/arthurdcosta311-sketch/local-llm-sketch/actions/workflows/build-ipa.yml/badge.svg)](https://github.com/arthurdcosta311-sketch/local-llm-sketch/actions/workflows/build-ipa.yml)
 [![Validate](https://github.com/arthurdcosta311-sketch/local-llm-sketch/actions/workflows/validate.yml/badge.svg)](https://github.com/arthurdcosta311-sketch/local-llm-sketch/actions/workflows/validate.yml)
 [![License: MIT](https://img.shields.io/badge/original%20code-MIT-2ea44f.svg)](LICENSE)
 
@@ -14,22 +13,26 @@ GitHub commit and CI dispatch, and a purple-first theme.
 
 ## Install
 
-Download `LocalLLMSketch.ipa` from
+Get `LocalLLMSketch.ipa` from the artifacts of a Codemagic build (or from
 [Releases](https://github.com/arthurdcosta311-sketch/local-llm-sketch/releases)
-and sideload it with AltStore, SideStore, Sideloadly, or TrollStore. It is
-unsigned and carries the JIT and increased-memory entitlements. See
-[release verification](Docs/RELEASE_VERIFICATION.md) for what a release contains
+once release publishing is enabled in `codemagic.yaml`) and sideload it with
+AltStore, SideStore, Sideloadly, or TrollStore. It is unsigned and carries the
+JIT and increased-memory entitlements. See
+[release verification](Docs/RELEASE_VERIFICATION.md) for what a build contains
 and how to check it.
 
-The IPA is built by `Build IPA`, which checks out the submodules, builds
-`llama.xcframework`, runs `xcodegen generate` and `pod install`, archives,
-packages, and attaches the IPA to a release tagged `v<version>-<build>`.
+The IPA is built by Codemagic from `codemagic.yaml`, which checks out the
+submodules, builds `llama.xcframework`, runs `xcodegen generate` and
+`pod install`, compiles the app and packages `LocalLLMSketch.ipa` as a build
+artifact. GitHub Actions runs only the free Linux checks in `validate.yml`.
 
-**That workflow needs a macOS runner.** It targets `macos-15` (arm64, GA).
-Earlier defaults were `macos-13` and then `macos-14` — both retired — and a job
-asking for a retired label never schedules. A manual run can pick `macos-26` or
-`macos-15-intel` from the `runner` dropdown instead. If Releases is still empty,
-read [Docs/CI.md](Docs/CI.md) for the runner and billing options.
+**Building it needs a macOS machine, and Codemagic provides it.** Add this
+repository at [codemagic.io](https://codemagic.io) once; it reads
+`codemagic.yaml` from the branch it builds, and a build is started from its UI.
+If you would rather publish the IPA as a GitHub Release, connect GitHub under
+Codemagic's Team → Integrations and uncomment the `publishing` block in
+`codemagic.yaml`. [Docs/CI.md](Docs/CI.md) explains the setup and the
+alternatives.
 
 ## What the assistant can do here
 

@@ -241,7 +241,7 @@ struct LASGitHubView: View {
                         await git.loadRuns(repository: repository)
                     }
                 } label: {
-                    Label("Build on GitHub", systemImage: "hammer")
+                    Label("Run checks on GitHub", systemImage: "hammer")
                         .frame(maxWidth: .infinity)
                 }
                 .buttonStyle(LASPrimaryButtonStyle())
@@ -262,7 +262,7 @@ struct LASGitHubView: View {
                 .buttonStyle(LASSecondaryButtonStyle())
                 .disabled(busy)
 
-                Text("The workflow archives the app, uploads the IPA, and attaches it to a GitHub Release. Dispatch needs the workflow on the default branch.")
+                Text("Starts the validate workflow: it parses every Swift file. The IPA is built by Codemagic from codemagic.yaml, which has to be started on codemagic.io. Dispatch needs the workflow on the default branch.")
                     .font(.caption2)
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)

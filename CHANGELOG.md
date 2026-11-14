@@ -15,13 +15,17 @@ and intends to use semantic version tags for source releases.
   of assuming JIT, and reports the result in Session and in the agent's brief.
 - JIT and unsigned-executable-memory entitlements in
   `IOSLocalLLM.entitlements`, for sideload signing paths that preserve them.
-- `Build IPA` now builds everything it needs on the runner: pinned submodules,
-  `llama.xcframework`, XcodeGen, CocoaPods, archive, IPA, release.
+- `codemagic.yaml`: one Codemagic workflow that builds everything the IPA needs —
+  pinned submodules, `llama.xcframework`, XcodeGen, CocoaPods, compile, package —
+  and prints the IPA's SHA-256 and version in its log.
 - `scripts/build_native_frameworks.sh --skip-whisper` for CI, which does not
   link whisper.cpp.
 
 ### Changed
 
+- The app is compiled by Codemagic from `codemagic.yaml` instead of by a GitHub
+  Actions macOS job. `.github/workflows/build-ipa.yml` is gone; Actions now runs
+  only the free Linux checks, and `github_build` in the app dispatches those.
 - README, badges and release docs now describe this fork rather than upstream.
 
 ### Removed

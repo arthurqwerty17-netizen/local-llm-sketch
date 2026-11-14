@@ -1,14 +1,16 @@
 # Release verification
 
-This fork publishes an **unsigned IPA** built by the `Build IPA` workflow. Upstream
-`Mesutcydev/ios-local-llm` published source-only releases; those instructions live
-in its own history and no longer describe what this repository releases.
+This fork publishes an **unsigned IPA** built by Codemagic from `codemagic.yaml`.
+Upstream `Mesutcydev/ios-local-llm` published source-only releases; those
+instructions live in its own history and no longer describe what this repository
+releases.
 
-## What a release here contains
+## What a build contains
 
-- `LocalLLMSketch.ipa` — an unsigned iOS app archive built from the tagged commit.
-- The release tag is `v<marketing version>-<build number>`, taken from the built
-  app's `Info.plist`, so two builds of the same version never collide.
+- `LocalLLMSketch.ipa` — an unsigned iOS app archive, packaged from the app
+  Codemagic compiled from that commit.
+- The workflow prints the IPA's SHA-256 and the app's `CFBundleShortVersionString`
+  in its build log, so a download can be checked against the run that made it.
 
 ## Install
 
@@ -20,12 +22,14 @@ signer. The app reports the truth at runtime in Session and in the agent's brief
 ## Verify the download
 
 ```bash
-gh release download --repo arthurdcosta311-sketch/local-llm-sketch --pattern '*.ipa'
+# from the Codemagic build page, or from a release if publishing is enabled
 shasum -a 256 LocalLLMSketch.ipa
 ```
 
-Every release is built by the workflow in this repository from a commit on
-`main` or `preview`; the release body names the ref and the SHA.
+Every build comes from the workflow in `codemagic.yaml` against a commit of this
+repository; the build log names the commit it checked out. If release publishing
+is enabled there, the release is tagged `v<marketing version>-<build number>` and
+its notes carry the same SHA-256.
 
 ## What this does not change
 

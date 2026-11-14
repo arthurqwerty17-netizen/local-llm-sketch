@@ -372,12 +372,13 @@ final class GitService: ObservableObject {
         return .success(url ?? URL(string: "https://github.com/\(repository.fullName)")!)
     }
 
-    /// Starts a workflow run. The companion `build-ipa.yml` in this repo is the
-    /// target: it archives the app, uploads the IPA, and attaches it to a
-    /// release, which is the "compile everything in Actions" path.
+    /// Starts a workflow run. The app itself is no longer compiled in Actions:
+    /// Codemagic builds the IPA from `codemagic.yaml`, so the default target
+    /// here is the free `validate.yml` check, which parses every Swift source.
+    /// Any other workflow on the default branch can be named instead.
     func dispatchWorkflow(
         repository: Repository,
-        workflowFile: String = "build-ipa.yml",
+        workflowFile: String = "validate.yml",
         ref: String? = nil
     ) async -> Result<String, GitFailure> {
         let body = try? JSONSerialization.data(withJSONObject: [
