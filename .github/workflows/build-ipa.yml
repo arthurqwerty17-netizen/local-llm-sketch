@@ -196,6 +196,9 @@ jobs:
           mkdir -p Payload
           cp -R build/LocalLLMSketch.xcarchive/Products/Applications/*.app Payload/
           zip -qry LocalLLMSketch.ipa Payload
+          # The release ships this checksum next to the IPA, so
+          # Docs/RELEASE_VERIFICATION.md can be followed literally.
+          shasum -a 256 LocalLLMSketch.ipa | tee LocalLLMSketch.ipa.sha256
           ls -la LocalLLMSketch.ipa
 
       - name: Read app version
@@ -206,7 +209,10 @@ jobs:
           version=$(/usr/libexec/PlistBuddy -c "Print :CFBundleShortVersionString" "$app/Info.plist")
           build=$(/usr/libexec/PlistBuddy -c "Print :CFBundleVersion" "$app/Info.plist")
           echo "version=$version" >>"$GITHUB_OUTPUT"
+          echo "build=$build" >>"$GITHUB_OUTPUT"
           echo "tag=v$version-$build" >>"$GITHUB_OUTPUT"
+          echo "sha256=$(shasum -a 256 LocalLLMSketch.ipa | awk '{ print $1 }')" >>"$GITHUB_OUTPUT"
+          echo "size=$(du -h LocalLLMSketch.ipa | awk '{ print $1 }')" >>"$GITHUB_OUTPUT"
 
       - name: Upload IPA artifact
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
@@ -216,19 +222,30 @@ jobs:
           if-no-files-found: error
           retention-days: 90
 
+      # The IPA leaves the run as a release asset, not only as a workflow
+      # artifact: artifacts expire and need a GitHub sign-in to download, a
+      # release asset is a plain link the phone can open.
       - name: Attach IPA to GitHub release
         uses: softprops/action-gh-release@c062e08bd532815e2082a85e87e3ef29c3e6d191 # v2.5.0
         with:
           tag_name: ${{ steps.version.outputs.tag }}
           name: ${{ format('Local LLM Sketch {0}', steps.version.outputs.tag) }}
           body: |
-            Unsigned IPA built from `${{ github.ref_name }}` at `${{ github.sha }}`.
+            Local LLM Sketch **${{ steps.version.outputs.version }}** (build
+            ${{ steps.version.outputs.build }}), unsigned, ${{ steps.version.outputs.size }}.
 
-            Sideload it with AltStore, SideStore, Sideloadly, or TrollStore. The
-            bundle declares the JIT and increased-memory entitlements; whether a
-            signing path keeps them decides whether JIT is live, and Session
-            reports the answer at runtime.
-          files: LocalLLMSketch.ipa
+            Built from `${{ github.ref_name }}` at `${{ github.sha }}`.
+
+            **SHA-256:** `${{ steps.version.outputs.sha256 }}`
+
+            Download `LocalLLMSketch.ipa`, then sideload it with AltStore,
+            SideStore, Sideloadly, or TrollStore. The bundle declares the JIT and
+            increased-memory entitlements; whether a signing path keeps them
+            decides whether JIT is live, and Session reports the answer at
+            runtime.
+          files: |
+            LocalLLMSketch.ipa
+            LocalLLMSketch.ipa.sha256
           fail_on_unmatched_files: true
           draft: false
           prerelease: false
