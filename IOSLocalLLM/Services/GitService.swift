@@ -1,6 +1,22 @@
 import Foundation
 import Combine
 
+// MARK: - GitFailure
+
+/// A GitHub failure carrying a message the UI can show.
+///
+/// `Result` requires its failure type to conform to `Error`, and a bare
+/// `String` does not, so every `Result<…, String>` here was a compile error.
+struct GitFailure: Error, LocalizedError {
+    let message: String
+
+    init(_ message: String) {
+        self.message = message
+    }
+
+    var errorDescription: String? { message }
+}
+
 // MARK: - GitService
 //
 // GitHub access for the assistant. Two halves:
@@ -131,10 +147,10 @@ final class GitService: ObservableObject {
 
     // MARK: - Requests
 
-    private func request(_ path: String, method: String = "GET", body: Data? = nil) async -> Result<Data, String> {
-        guard let token else { return .failure("No GitHub token saved.") }
+    private func request(_ path: String, method: String = "GET", body: Data? = nil) async -> Result<Data, GitFailure> {
+        guard let token else { return .failure(GitFailure("No GitHub token saved.")) }
         guard let url = URL(string: "https://api.github.com\(path)") else {
-            return .failure("Bad GitHub path.")
+            return .failure(GitFailure("Bad GitHub path."))
         }
         var request = URLRequest(url: url)
         request.httpMethod = method
@@ -149,23 +165,23 @@ final class GitService: ObservableObject {
                 try await session.data(for: request)
             }
             guard let http = response as? HTTPURLResponse else {
-                return .failure("GitHub returned a non-HTTP response.")
+                return .failure(GitFailure("GitHub returned a non-HTTP response."))
             }
             switch http.statusCode {
             case 200...299:
                 return .success(data)
             case 401:
-                return .failure("GitHub rejected the token. Check that it has repo scope.")
+                return .failure(GitFailure("GitHub rejected the token. Check that it has repo scope."))
             case 403:
-                return .failure("GitHub refused the request (rate limit or insufficient scope).")
+                return .failure(GitFailure("GitHub refused the request (rate limit or insufficient scope)."))
             case 404:
-                return .failure("GitHub could not find that resource. Check the owner and repository name.")
+                return .failure(GitFailure("GitHub could not find that resource. Check the owner and repository name."))
             default:
                 let text = String(data: data, encoding: .utf8) ?? ""
-                return .failure("GitHub error \(http.statusCode): \(text.prefix(200))")
+                return .failure(GitFailure("GitHub error \(http.statusCode): \(text.prefix(200))"))
             }
         } catch {
-            return .failure(error.localizedDescription)
+            return .failure(GitFailure(error.localizedDescription))
         }
     }
 
@@ -188,8 +204,8 @@ final class GitService: ObservableObject {
         guard case .success(let data) = await request(
             "/user/repos?per_page=100&sort=updated&affiliation=owner,collaborator,organization_member"
         ) else {
-            if case .failure(let message) = await request("/user/repos?per_page=1&sort=updated") {
-                lastError = message
+            if case .failure(let failure) = await request("/user/repos?per_page=1&sort=updated") {
+                lastError = failure.message
             }
             return
         }
@@ -321,7 +337,7 @@ final class GitService: ObservableObject {
         contents: String,
         message: String,
         branch: String? = nil
-    ) async -> Result<URL, String> {
+    ) async -> Result<URL, GitFailure> {
         let ref = branch ?? repository.defaultBranch
         let encoded = filePath.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? filePath
 
@@ -341,14 +357,14 @@ final class GitService: ObservableObject {
         if let sha { payload["sha"] = sha }
 
         guard let body = try? JSONSerialization.data(withJSONObject: payload) else {
-            return .failure("Could not encode the commit.")
+            return .failure(GitFailure("Could not encode the commit."))
         }
         guard case .success(let data) = await request(
             "/repos/\(repository.fullName)/contents/\(encoded)",
             method: "PUT",
             body: body
         ) else {
-            return .failure("GitHub rejected the commit.")
+            return .failure(GitFailure("GitHub rejected the commit."))
         }
         let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any]
         let url = ((object?["commit"] as? [String: Any])?["html_url"] as? String)
@@ -363,7 +379,7 @@ final class GitService: ObservableObject {
         repository: Repository,
         workflowFile: String = "build-ipa.yml",
         ref: String? = nil
-    ) async -> Result<String, String> {
+    ) async -> Result<String, GitFailure> {
         let body = try? JSONSerialization.data(withJSONObject: [
             "ref": ref ?? repository.defaultBranch
         ])
@@ -375,13 +391,13 @@ final class GitService: ObservableObject {
         switch result {
         case .success:
             return .success("Dispatched \(workflowFile) on \(ref ?? repository.defaultBranch).")
-        case .failure(let message):
+        case .failure(let failure):
             // 204 No Content is the documented success; a 404 usually means the
             // workflow file is not on the default branch yet.
-            if message.contains("404") {
-                return .failure("That workflow is not on \(repository.defaultBranch) yet.")
+            if failure.message.contains("404") {
+                return .failure(GitFailure("That workflow is not on \(repository.defaultBranch) yet."))
             }
-            return .failure(message)
+            return .failure(failure)
         }
     }
 

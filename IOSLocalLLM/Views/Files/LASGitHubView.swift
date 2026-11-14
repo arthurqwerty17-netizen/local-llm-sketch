@@ -236,7 +236,7 @@ struct LASGitHubView: View {
                         busy = false
                         switch result {
                         case .success(let message): status = message
-                        case .failure(let message): status = message
+                        case .failure(let failure): status = failure.message
                         }
                         await git.loadRuns(repository: repository)
                     }

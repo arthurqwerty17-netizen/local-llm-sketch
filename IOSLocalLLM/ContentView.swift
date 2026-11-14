@@ -288,6 +288,8 @@ struct LocalAPIServerView: View {
 }
 
 private struct LASHomeHeader: View {
+    @ObservedObject private var router = TabRouter.shared
+
     var body: some View {
         VStack(spacing: LASDesignTokens.tight) {
             HStack(spacing: LASDesignTokens.row) {

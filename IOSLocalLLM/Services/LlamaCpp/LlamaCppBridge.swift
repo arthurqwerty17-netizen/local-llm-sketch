@@ -258,15 +258,19 @@ final class LlamaCppVLM: @unchecked Sendable {
     }
 
     /// Canonical llama.cpp order: penalties -> top-k -> top-p -> temp -> dist.
+    ///
+    /// `llama_sampler_init_penalties` takes the vocabulary size as its first
+    /// argument in current llama.cpp, so the caller passes it in.
     private static func makeSampler(
-        _ spec: LlamaCppSamplerSpec
+        _ spec: LlamaCppSamplerSpec,
+        vocabSize: Int32
     ) -> UnsafeMutablePointer<llama_sampler>? {
         let params = llama_sampler_chain_default_params()
         guard let chain = llama_sampler_chain_init(params) else { return nil }
         if abs(spec.repetitionPenalty - 1) > 0.001 {
             llama_sampler_chain_add(
                 chain,
-                llama_sampler_init_penalties(64, spec.repetitionPenalty, 0, 0)
+                llama_sampler_init_penalties(vocabSize, 64, spec.repetitionPenalty, 0, 0)
             )
         }
         if spec.topK > 0 {
@@ -318,7 +322,10 @@ final class LlamaCppVLM: @unchecked Sendable {
         let ownedSampler: UnsafeMutablePointer<llama_sampler>?
         let samp: UnsafeMutablePointer<llama_sampler>
         if let samplerSpec {
-            guard let created = Self.makeSampler(samplerSpec) else {
+            guard let created = Self.makeSampler(
+                samplerSpec,
+                vocabSize: llama_vocab_n_tokens(llama_model_get_vocab(m))
+            ) else {
                 throw LlamaCppError.contextInitFailed
             }
             ownedSampler = created

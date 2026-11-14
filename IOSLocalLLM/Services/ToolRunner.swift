@@ -933,12 +933,13 @@ enum ToolRunner {
 
     // MARK: - GitHub
 
-    private static func linkedRepositoryOrError() -> Result<GitService.Repository, String> {
+    @MainActor
+    private static func linkedRepositoryOrError() -> Result<GitService.Repository, GitFailure> {
         guard GitService.shared.hasToken else {
-            return .failure("No GitHub token saved. Ask the user to add one in GitHub settings.")
+            return .failure(GitFailure("No GitHub token saved. Ask the user to add one in GitHub settings."))
         }
         guard let repository = GitService.shared.linkedRepository else {
-            return .failure("No repository is linked. Ask the user to pick one in GitHub settings.")
+            return .failure(GitFailure("No repository is linked. Ask the user to pick one in GitHub settings."))
         }
         return .success(repository)
     }
@@ -946,7 +947,7 @@ enum ToolRunner {
     @MainActor
     private static func runGitHubRepoFiles() async -> String {
         switch linkedRepositoryOrError() {
-        case .failure(let message): return message
+        case .failure(let failure): return failure.message
         case .success(let repository):
             let tree = await GitService.shared.listTree(repository: repository)
             guard !tree.isEmpty else {
@@ -964,7 +965,7 @@ enum ToolRunner {
             return "Error: missing 'path'."
         }
         switch linkedRepositoryOrError() {
-        case .failure(let message): return message
+        case .failure(let failure): return failure.message
         case .success(let repository):
             guard let text = await GitService.shared.readFile(repository: repository, path: path) else {
                 return "Could not read '\(path)' from \(repository.fullName)."
@@ -988,7 +989,7 @@ enum ToolRunner {
         }
         let message = (args["message"] as? String) ?? "Update \(path)"
         switch linkedRepositoryOrError() {
-        case .failure(let failure): return failure
+        case .failure(let failure): return failure.message
         case .success(let repository):
             let result = await GitService.shared.commitFile(
                 repository: repository,
@@ -1000,7 +1001,7 @@ enum ToolRunner {
             case .success(let url):
                 return "Committed \(path) to \(repository.fullName). \(url.absoluteString)"
             case .failure(let failure):
-                return "Commit failed: \(failure)"
+                return "Commit failed: \(failure.message)"
             }
         }
     }
@@ -1008,12 +1009,12 @@ enum ToolRunner {
     @MainActor
     private static func runGitHubBuild() async -> String {
         switch linkedRepositoryOrError() {
-        case .failure(let message): return message
+        case .failure(let failure): return failure.message
         case .success(let repository):
             let result = await GitService.shared.dispatchWorkflow(repository: repository)
             switch result {
             case .success(let message): return message
-            case .failure(let failure): return "Build dispatch failed: \(failure)"
+            case .failure(let failure): return "Build dispatch failed: \(failure.message)"
             }
         }
     }
@@ -1021,7 +1022,7 @@ enum ToolRunner {
     @MainActor
     private static func runGitHubRuns() async -> String {
         switch linkedRepositoryOrError() {
-        case .failure(let message): return message
+        case .failure(let failure): return failure.message
         case .success(let repository):
             await GitService.shared.loadRuns(repository: repository)
             let runs = GitService.shared.runs
